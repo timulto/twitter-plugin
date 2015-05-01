@@ -9,10 +9,12 @@ import (
 	"io/ioutil"
 	"mime/multipart"
 	"net/http"
-	//"os"
+	"os"
 	"strings"
 	"time"
 	"encoding/json"
+    "encoding/base64"
+    "log"
 )
 
 func LoadCredentials() (client *twittergo.Client, err error) {
@@ -34,20 +36,21 @@ func LoadCredentials() (client *twittergo.Client, err error) {
 	return
 }
 
-func GetBody() (body io.ReadWriter, header string, err error) {
+func GetBody(message string, media []byte) (body io.ReadWriter, header string, err error) {
 	var (
-		mp     *multipart.Writer
-		media  []byte
+		mp *multipart.Writer
+		//media  []byte
 		writer io.Writer
 	)
 	body = bytes.NewBufferString("")
 	mp = multipart.NewWriter(body)
-	media, err = ioutil.ReadFile("media.png")
-	if err != nil {
-		return
-	}
+//	media, err = ioutil.ReadFile("media.png")
+//	if err != nil {
+//		return
+//	}
+    fmt.Println(media)
 	mp.WriteField("status", fmt.Sprintf("Hello %v!", time.Now()))
-	writer, err = mp.CreateFormFile("media[]", "media.png")
+	writer, err = mp.CreateFormField("media[]")
 	if err != nil {
 		return
 	}
@@ -57,103 +60,121 @@ func GetBody() (body io.ReadWriter, header string, err error) {
 	return
 }
 
-type Fine struct {
-	_id string
-	address string
-	approved int
-	category string
-	createdAt string
-	imageData string
-	owner string
-	text string
-	username string
+type location struct {
+      Type string
+      Coordinates []float32
 }
 
-func getFines() {
+type Fine struct {
+    _id string
+    Address string
+    Approved int
+    Category string
+    CreatedAt string
+    ImageData string
+    Loc location
+    Text string
+}
 
-	url := "http://timulto.meteor.com/api/fines/twitter"
+func getFines() (data []Fine) {
 
-	resp, err := http.Get(url)
+    url := "http://timulto.meteor.com/api/fines/twitter"
+    resp, err := http.Get(url)
 
 	if err != nil {
 		fmt.Printf("Error while requesting data %v\n", err)
 	}
 
-	// read json http from response
-	jsonDataFromHttp, err := ioutil.ReadAll(resp.Body)
+    jsonDataFromHttp, err := ioutil.ReadAll(resp.Body)
+    //jsonDataFromHttp, err := ioutil.ReadFile("test1.json")
+    //s := string(jsonDataFromHttp[:])
 
-	if err != nil {
-		fmt.Printf("Error while parsing json response %v\n", err)
-	}
+    if err != nil {
+        log.Fatal(err)
+    }
+    //data []Fine
+    err = json.Unmarshal(jsonDataFromHttp, &data)
 
-	var jsonData []Fine
-
-	err = json.Unmarshal([]byte(jsonDataFromHttp), &jsonData)
-
-	fmt.Println(jsonData)
-	
-	//fmt.Printf("%+v", jsonDataFromHttp)
+    if err != nil {
+        log.Fatal(err)
+    }
+    return
 }
 
+func decode(str string) (data []byte){
+
+	//str := "c29tZSBkYXRhIHdpdGggACBhbmQg77u/"
+	data, err := base64.StdEncoding.DecodeString(str)
+	if err != nil {
+		fmt.Println("error:", err)
+		return
+	}
+	return
+}
 
 func main() {
 
-	getFines()
+    var (
+		err    error
+		client *twittergo.Client
+		req    *http.Request
+		resp   *twittergo.APIResponse
+		tweet  *twittergo.Tweet
+	);
 
-//	var (
-//		err    error
-//		client *twittergo.Client
-//		req    *http.Request
-//		resp   *twittergo.APIResponse
-//		tweet  *twittergo.Tweet
-//	);
-//
-//	client, err = LoadCredentials();
-//	if err != nil {
-//		fmt.Printf("Could not parse CREDENTIALS file: %v\n", err);
-//		os.Exit(1);
-//	}
-//
-//	body, header, err := GetBody()
-//	if err != nil {
-//		fmt.Printf("Problem loading body: %v\n", err)
-//		os.Exit(1)
-//	}
-//
-//	endpoint := "/1.1/statuses/update_with_media.json"
-//	req, err = http.NewRequest("POST", endpoint, body)
-//	if err != nil {
-//		fmt.Printf("Could not parse request: %v\n", err)
-//		os.Exit(1)
-//	}
-//	req.Header.Set("Content-Type", header)
-//
-//	resp, err = client.SendRequest(req)
-//	if err != nil {
-//		fmt.Printf("Could not send request: %v\n", err)
-//		os.Exit(1)
-//	}
-//	tweet = &twittergo.Tweet{}
-//	err = resp.Parse(tweet)
-//	if err != nil {
-//		fmt.Printf("Problem parsing response: %v\n", err)
-//		os.Exit(1)
-//	}
-//	fmt.Printf("ID:                         %v\n", tweet.Id())
-//	fmt.Printf("Tweet:                      %v\n", tweet.Text())
-//	fmt.Printf("User:                       %v\n", tweet.User().Name())
-//	if resp.HasRateLimit() {
-//		fmt.Printf("Rate limit:                 %v\n", resp.RateLimit())
-//		fmt.Printf("Rate limit remaining:       %v\n", resp.RateLimitRemaining())
-//		fmt.Printf("Rate limit reset:           %v\n", resp.RateLimitReset())
-//	} else {
-//		fmt.Printf("Could not parse rate limit from response.\n")
-//	}
-//	if resp.HasMediaRateLimit() {
-//		fmt.Printf("Media Rate limit:           %v\n", resp.MediaRateLimit())
-//		fmt.Printf("Media Rate limit remaining: %v\n", resp.MediaRateLimitRemaining())
-//		fmt.Printf("Media Rate limit reset:     %v\n", resp.MediaRateLimitReset())
-//	} else {
-//		fmt.Printf("Could not parse media rate limit from response.\n")
-//	}
+	client, err = LoadCredentials();
+	if err != nil {
+		fmt.Printf("Could not parse CREDENTIALS file: %v\n", err);
+		os.Exit(1);
+	}
+
+    var toTwet = getFines()
+    var image []byte
+	endpoint := "/1.1/statuses/update_with_media.json"
+
+    for _, element := range toTwet {
+
+        image = decode(element.ImageData[22:])
+        body, header, err := GetBody(element.Text, image)
+        if err != nil {
+            fmt.Printf("Problem loading body: %v\n", err)
+            os.Exit(1)
+        }
+
+        req, err = http.NewRequest("POST", endpoint, body)
+        if err != nil {
+            fmt.Printf("Could not parse request: %v\n", err)
+            os.Exit(1)
+        }
+        req.Header.Set("Content-Type", header)
+
+        resp, err = client.SendRequest(req)
+        if err != nil {
+            fmt.Printf("Could not send request: %v\n", err)
+            os.Exit(1)
+        }
+        tweet = &twittergo.Tweet{}
+        err = resp.Parse(tweet)
+        if err != nil {
+            fmt.Printf("Problem parsing response: %v\n", err)
+            os.Exit(1)
+        }
+        fmt.Printf("ID:                         %v\n", tweet.Id())
+        fmt.Printf("Tweet:                      %v\n", tweet.Text())
+        fmt.Printf("User:                       %v\n", tweet.User().Name())
+        if resp.HasRateLimit() {
+            fmt.Printf("Rate limit:                 %v\n", resp.RateLimit())
+            fmt.Printf("Rate limit remaining:       %v\n", resp.RateLimitRemaining())
+            fmt.Printf("Rate limit reset:           %v\n", resp.RateLimitReset())
+        } else {
+            fmt.Printf("Could not parse rate limit from response.\n")
+        }
+        if resp.HasMediaRateLimit() {
+            fmt.Printf("Media Rate limit:           %v\n", resp.MediaRateLimit())
+            fmt.Printf("Media Rate limit remaining: %v\n", resp.MediaRateLimitRemaining())
+            fmt.Printf("Media Rate limit reset:     %v\n", resp.MediaRateLimitReset())
+        } else {
+            fmt.Printf("Could not parse media rate limit from response.\n")
+        }
+    }
 }
