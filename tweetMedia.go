@@ -43,17 +43,18 @@ func GetBody(message string, media []byte, address string) (body io.ReadWriter, 
 		writer io.Writer
 		msg string
 	)
+	const layout = "20-01-2006 15:04:05"
+
 	body = bytes.NewBufferString("")
 	mp = multipart.NewWriter(body)
-//	media, err = ioutil.ReadFile("media.png")
-//	if err != nil {
-//		return
-//	}
+
     fmt.Println(media)
+
+	t := time.Now()
 	if message != "" {
-	    msg = fmt.Sprintf("%v", time.Now()) + " '" +  message + "'" + " In " + address
+	    msg = fmt.Sprintf("%v", t.Format(layout)) + " '" +  message + "'" + " In " + address
 	} else {
-		msg = fmt.Sprintf("%v", time.Now()) + " In " + address
+		msg = fmt.Sprintf("%v", t.Format(layout)) + " In " + address
 	}
 
 	mp.WriteField("status", fmt.Sprintf(msg))
