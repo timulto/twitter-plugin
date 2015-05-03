@@ -9,12 +9,14 @@ import (
 	"io/ioutil"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
 	"encoding/json"
     "encoding/base64"
     "log"
+	"strconv"
 )
 
 func LoadCredentials() (client *twittergo.Client, err error) {
@@ -36,25 +38,25 @@ func LoadCredentials() (client *twittergo.Client, err error) {
 	return
 }
 
-func GetBody(message string, media []byte, address string) (body io.ReadWriter, header string, err error) {
+func GetBody(message string, media []byte, address string, createdAt string) (body io.ReadWriter, header string, err error) {
 	var (
 		mp *multipart.Writer
 		//media  []byte
 		writer io.Writer
 		msg string
 	)
-	const layout = "20-01-2006 15:04:05"
 
 	body = bytes.NewBufferString("")
 	mp = multipart.NewWriter(body)
 
-    fmt.Println(media)
+	t, _ := time.Parse(time.RFC3339, createdAt)
+    t1 := t.Format(time.RFC822)
+	t1 = t1[0:len(t1)-3]
 
-	t := time.Now()
 	if message != "" {
-	    msg = fmt.Sprintf("%v", t.Format(layout)) + " '" +  message + "'" + " In " + address
+	    msg = fmt.Sprintf("%v", t1) + " '" +  message + "'" + " In " + address
 	} else {
-		msg = fmt.Sprintf("%v", t.Format(layout)) + " In " + address
+		msg = fmt.Sprintf("%v", t1) + " In " + address
 	}
 
 	mp.WriteField("status", fmt.Sprintf(msg))
@@ -77,7 +79,7 @@ type location struct {
 }
 
 type Fine struct {
-    _id string
+    Id string `json:"_id"`
     Address string
     Approved int
     Category string
@@ -89,16 +91,17 @@ type Fine struct {
 
 func getFines() (data []Fine) {
 
-    url := "http://beta.timulto.org/api/fines/twitter"
-    resp, err := http.Get(url)
+    timultoUrl := "http://beta.timulto.org/api/fines/twitter"
+    resp, err := http.Get(timultoUrl)
+
 
 	if err != nil {
 		fmt.Printf("Error while requesting data %v\n", err)
 	}
 
     jsonDataFromHttp, err := ioutil.ReadAll(resp.Body)
-    //jsonDataFromHttp, err := ioutil.ReadFile("test1.json")
     //s := string(jsonDataFromHttp[:])
+    // fmt.Printf(s)
 
     if err != nil {
         log.Fatal(err)
@@ -114,7 +117,6 @@ func getFines() (data []Fine) {
 
 func decode(str string) (data []byte){
 
-	//str := "c29tZSBkYXRhIHdpdGggACBhbmQg77u/"
 	data, err := base64.StdEncoding.DecodeString(str)
 	if err != nil {
 		fmt.Println("error:", err)
@@ -148,10 +150,17 @@ func main() {
     var image []byte
 	endpoint := "/1.1/statuses/update_with_media.json"
 
+	if len(toTwet) == 0 {
+	    fmt.Println("No mew tweet to post")
+	}
+
     for _, element := range toTwet {
 
+		fmt.Println(element.Id)
+
         image = decode(element.ImageData[22:])
-        body, header, err := GetBody(element.Text, image, element.Address)
+        body, header, err := GetBody(element.Text, image, element.Address, element.CreatedAt)
+
         if err != nil {
             fmt.Printf("Problem loading body: %v\n", err)
             os.Exit(1)
@@ -178,19 +187,35 @@ func main() {
         fmt.Printf("ID:                         %v\n", tweet.Id())
         fmt.Printf("Tweet:                      %v\n", tweet.Text())
         fmt.Printf("User:                       %v\n", tweet.User().Name())
-        if resp.HasRateLimit() {
-            fmt.Printf("Rate limit:                 %v\n", resp.RateLimit())
-            fmt.Printf("Rate limit remaining:       %v\n", resp.RateLimitRemaining())
-            fmt.Printf("Rate limit reset:           %v\n", resp.RateLimitReset())
+
+		// Mark fine posted on twitter
+        url1 := "http://beta.timulto.org/api/fine/" + element.Id +  "/twitter"
+		tId := strconv.FormatUint(tweet.Id(), 10)
+
+        parameters := url.Values{}
+		parameters.Add("postId", tId)
+		resp1, err1 :=http.PostForm(url1, parameters)
+
+        if err1 != nil {
+            fmt.Println("Problem while marking tweet " + tId + " published.")
         } else {
-            fmt.Printf("Could not parse rate limit from response.\n")
-        }
-        if resp.HasMediaRateLimit() {
-            fmt.Printf("Media Rate limit:           %v\n", resp.MediaRateLimit())
-            fmt.Printf("Media Rate limit remaining: %v\n", resp.MediaRateLimitRemaining())
-            fmt.Printf("Media Rate limit reset:     %v\n", resp.MediaRateLimitReset())
-        } else {
-            fmt.Printf("Could not parse media rate limit from response.\n")
-        }
+			fmt.Println("Tweet " + tId + " marked as published.")
+		}
+        _, err1 = ioutil.ReadAll(resp1.Body)
+
+//        if resp.HasRateLimit() {
+//            fmt.Printf("Rate limit:                 %v\n", resp.RateLimit())
+//            fmt.Printf("Rate limit remaining:       %v\n", resp.RateLimitRemaining())
+//            fmt.Printf("Rate limit reset:           %v\n", resp.RateLimitReset())
+//        } else {
+//            fmt.Printf("Could not parse rate limit from response.\n")
+//        }
+//        if resp.HasMediaRateLimit() {
+//            fmt.Printf("Media Rate limit:           %v\n", resp.MediaRateLimit())
+//            fmt.Printf("Media Rate limit remaining: %v\n", resp.MediaRateLimitRemaining())
+//            fmt.Printf("Media Rate limit reset:     %v\n", resp.MediaRateLimitReset())
+//        } else {
+//            fmt.Printf("Could not parse media rate limit from response.\n")
+//        }
     }
 }
