@@ -36,11 +36,12 @@ func LoadCredentials() (client *twittergo.Client, err error) {
 	return
 }
 
-func GetBody(message string, media []byte) (body io.ReadWriter, header string, err error) {
+func GetBody(message string, media []byte, address string) (body io.ReadWriter, header string, err error) {
 	var (
 		mp *multipart.Writer
 		//media  []byte
 		writer io.Writer
+		msg string
 	)
 	body = bytes.NewBufferString("")
 	mp = multipart.NewWriter(body)
@@ -49,7 +50,16 @@ func GetBody(message string, media []byte) (body io.ReadWriter, header string, e
 //		return
 //	}
     fmt.Println(media)
-	mp.WriteField("status", fmt.Sprintf("Hello %v!", time.Now()))
+	if message != "" {
+	    msg = fmt.Sprintf("%v", time.Now()) + " '" +  message + "'" + " In " + address
+	} else {
+		msg = fmt.Sprintf("%v", time.Now()) + " In " + address
+	}
+
+	mp.WriteField("status", fmt.Sprintf(msg))
+
+	//placeId := getPlaceId(latitude, longitude)
+    //mp.WriteField("place_id", placeId)
 	writer, err = mp.CreateFormField("media[]")
 	if err != nil {
 		return
@@ -78,7 +88,7 @@ type Fine struct {
 
 func getFines() (data []Fine) {
 
-    url := "http://timulto.meteor.com/api/fines/twitter"
+    url := "http://beta.timulto.org/api/fines/twitter"
     resp, err := http.Get(url)
 
 	if err != nil {
@@ -112,6 +122,11 @@ func decode(str string) (data []byte){
 	return
 }
 
+//func getPlaceId(latitude float32, longitude float32) (place string) {
+//
+//
+//}
+
 func main() {
 
     var (
@@ -135,7 +150,7 @@ func main() {
     for _, element := range toTwet {
 
         image = decode(element.ImageData[22:])
-        body, header, err := GetBody(element.Text, image)
+        body, header, err := GetBody(element.Text, image, element.Address)
         if err != nil {
             fmt.Printf("Problem loading body: %v\n", err)
             os.Exit(1)
