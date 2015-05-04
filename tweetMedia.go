@@ -125,10 +125,47 @@ func decode(str string) (data []byte){
 	return
 }
 
-//func getPlaceId(latitude float32, longitude float32) (place string) {
-//
-//
-//}
+type PlaceResult struct {
+	Id string
+}
+
+type Place struct {
+	Result []PlaceResult
+}
+
+func getPlaceId(latitude float32, longitude float32) (p string) {
+
+	var client *twittergo.Client
+
+	var data Place
+
+	client, _ = LoadCredentials();
+
+	twitterUrl := "https://api.twitter.com/1.1/geo/search.json"
+	req, _ := http.NewRequest("GET", twitterUrl, nil)
+
+	resp, err := client.SendRequest(req)
+
+	if err != nil {
+		fmt.Println("error:", err)
+		return
+	}
+
+	jsonDataFromHttp, err1 := ioutil.ReadAll(resp.Body)
+	if err1 != nil {
+		fmt.Println("error:", err1)
+		return
+	}
+
+	err2 := json.Unmarshal(jsonDataFromHttp, &data)
+	if err2 != nil {
+		fmt.Println("error:", err2)
+		return
+	}
+
+	return data.Result[0].Id
+
+}
 
 func main() {
 
