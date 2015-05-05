@@ -9,7 +9,7 @@ import (
 	"io/ioutil"
 	"mime/multipart"
 	"net/http"
-	"net/url"
+	//"net/url"
 	"os"
 	"strings"
 	"time"
@@ -38,7 +38,7 @@ func LoadCredentials() (client *twittergo.Client, err error) {
 	return
 }
 
-func GetBody(message string, media []byte, address string, createdAt string) (body io.ReadWriter, header string, err error) {
+func GetBody(message string, media []byte, address string, createdAt string, placeId string) (body io.ReadWriter, header string, err error) {
 	var (
 		mp *multipart.Writer
 		//media  []byte
@@ -60,6 +60,7 @@ func GetBody(message string, media []byte, address string, createdAt string) (bo
 	}
 
 	mp.WriteField("status", fmt.Sprintf(msg))
+	mp.WriteField("place_id", placeId)
 
 	//placeId := getPlaceId(latitude, longitude)
     //mp.WriteField("place_id", placeId)
@@ -75,7 +76,7 @@ func GetBody(message string, media []byte, address string, createdAt string) (bo
 
 type location struct {
       Type string
-      Coordinates []float32
+      Coordinates []float64
 }
 
 type Fine struct {
@@ -126,44 +127,62 @@ func decode(str string) (data []byte){
 }
 
 type PlaceResult struct {
-	Id string
+	Places []Location `json:"places"`
+}
+
+type Location struct {
+	Id string `json:"id"`
 }
 
 type Place struct {
-	Result []PlaceResult
+	Result PlaceResult `json:"result"`
 }
 
-func getPlaceId(latitude float32, longitude float32) (p string) {
+func getPlaceId(latitude float64, longitude float64) (p string) {
 
 	var client *twittergo.Client
 
 	var data Place
 
-	client, _ = LoadCredentials();
+	fmt.Printf("Looking for coordinates %v and %v\n", latitude, longitude)
 
-	twitterUrl := "https://api.twitter.com/1.1/geo/search.json"
-	req, _ := http.NewRequest("GET", twitterUrl, nil)
 
-	resp, err := client.SendRequest(req)
-
+	client, err := LoadCredentials();
 	if err != nil {
-		fmt.Println("error:", err)
-		return
+		fmt.Printf("Error while loading credential: ", err)
 	}
 
-	jsonDataFromHttp, err1 := ioutil.ReadAll(resp.Body)
+//	twitterUrl := "https://api.twitter.com/1.1/geo/search.json?lat=" + strconv.FormatFloat(latitude, 'f', 1, 32) + "&long=" + strconv.FormatFloat(longitude, 'f', 1, 32)
+	twitterUrl := "https://api.twitter.com/1.1/geo/reverse_geocode.json?lat=" + strconv.FormatFloat(latitude, 'f', 1, 32) + "&long=" + strconv.FormatFloat(longitude, 'f', 1, 32)
+
+	req, err1 := http.NewRequest("GET", twitterUrl, nil)
 	if err1 != nil {
-		fmt.Println("error:", err1)
-		return
+		fmt.Printf("Error while creating the request object: ", err1)
 	}
 
-	err2 := json.Unmarshal(jsonDataFromHttp, &data)
+	resp, err2 := client.SendRequest(req)
 	if err2 != nil {
-		fmt.Println("error:", err2)
+		fmt.Println("Error while sending the request: ", err2)
 		return
 	}
 
-	return data.Result[0].Id
+	jsonDataFromHttp, err3 := ioutil.ReadAll(resp.Body)
+	if err3 != nil {
+		fmt.Println("Error while reading response body: ", err3)
+		return
+	}
+//	fmt.Println(string(jsonDataFromHttp[:]))
+
+	err4 := json.Unmarshal(jsonDataFromHttp, &data)
+	if err4 != nil {
+		fmt.Println("Error while parsing json response: ", err4)
+		return
+	}
+
+	if len(data.Result.Places) >0 {
+		return data.Result.Places[0].Id
+	}
+	return ""
 
 }
 
@@ -185,7 +204,7 @@ func main() {
 
     var toTwet = getFines()
     var image []byte
-	endpoint := "/1.1/statuses/update_with_media.json"
+	baseendpoint := "/1.1/statuses/update_with_media.json"
 
 	if len(toTwet) == 0 {
 	    fmt.Println("No mew tweet to post")
@@ -193,10 +212,15 @@ func main() {
 
     for _, element := range toTwet {
 
-		fmt.Println(element.Id)
+
+		placeId := getPlaceId(element.Loc.Coordinates[0], element.Loc.Coordinates[1])
+
+		endpoint := baseendpoint + "?place_id=" + placeId + "&display_coordinates=true"
+
+		fmt.Printf("Place ID: %v\n", placeId)
 
         image = decode(element.ImageData[22:])
-        body, header, err := GetBody(element.Text, image, element.Address, element.CreatedAt)
+        body, header, err := GetBody(element.Text, image, element.Address, element.CreatedAt, placeId)
 
         if err != nil {
             fmt.Printf("Problem loading body: %v\n", err)
@@ -226,19 +250,19 @@ func main() {
         fmt.Printf("User:                       %v\n", tweet.User().Name())
 
 		// Mark fine posted on twitter
-        url1 := "http://beta.timulto.org/api/fine/" + element.Id +  "/twitter"
-		tId := strconv.FormatUint(tweet.Id(), 10)
-
-        parameters := url.Values{}
-		parameters.Add("postId", tId)
-		resp1, err1 :=http.PostForm(url1, parameters)
-
-        if err1 != nil {
-            fmt.Println("Problem while marking tweet " + tId + " published.")
-        } else {
-			fmt.Println("Tweet " + tId + " marked as published.")
-		}
-        _, err1 = ioutil.ReadAll(resp1.Body)
+//        url1 := "http://beta.timulto.org/api/fine/" + element.Id +  "/twitter"
+//		tId := strconv.FormatUint(tweet.Id(), 10)
+//
+//        parameters := url.Values{}
+//		parameters.Add("postId", tId)
+//		resp1, err1 :=http.PostForm(url1, parameters)
+//
+//        if err1 != nil {
+//            fmt.Println("Problem while marking tweet " + tId + " published.")
+//        } else {
+//			fmt.Println("Tweet " + tId + " marked as published.")
+//		}
+//        _, err1 = ioutil.ReadAll(resp1.Body)
 
 //        if resp.HasRateLimit() {
 //            fmt.Printf("Rate limit:                 %v\n", resp.RateLimit())
