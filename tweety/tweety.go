@@ -9,13 +9,12 @@ import (
 	"io/ioutil"
 	"mime/multipart"
 	"net/http"
-	//"net/url"
+	"net/url"
 	"os"
 	"strings"
 	"time"
 	"encoding/json"
     "encoding/base64"
-    "log"
 	"strconv"
 )
 
@@ -60,14 +59,11 @@ func GetBody(message string, media []byte, address string, createdAt string, pla
 	}
 
 	mp.WriteField("status", fmt.Sprintf(msg))
-	mp.WriteField("place_id", placeId)
+//	mp.WriteField("place_id", placeId)
 
-	//placeId := getPlaceId(latitude, longitude)
-    //mp.WriteField("place_id", placeId)
 	writer, err = mp.CreateFormField("media[]")
-	if err != nil {
-		return
-	}
+	errorHandling(err, "Error while creating writer: ", 1)
+
 	writer.Write(media)
 	header = fmt.Sprintf("multipart/form-data;boundary=%v", mp.Boundary())
 	mp.Close()
@@ -94,25 +90,15 @@ func getFines() (data []Fine) {
 
     timultoUrl := "http://beta.timulto.org/api/fines/twitter"
     resp, err := http.Get(timultoUrl)
-
-
-	if err != nil {
-		fmt.Printf("Error while requesting data %v\n", err)
-	}
+	errorHandling(err, "Error while requesting data: ", 1)
 
     jsonDataFromHttp, err := ioutil.ReadAll(resp.Body)
-    //s := string(jsonDataFromHttp[:])
-    // fmt.Printf(s)
+	errorHandling(err, "Error while parsing body: ", 1)
 
-    if err != nil {
-        log.Fatal(err)
-    }
     //data []Fine
     err = json.Unmarshal(jsonDataFromHttp, &data)
+	errorHandling(err, "Error while unmarshalling fines: ", 1)
 
-    if err != nil {
-        log.Fatal(err)
-    }
     return
 }
 
@@ -146,38 +132,25 @@ func getPlaceId(latitude float64, longitude float64) (p string) {
 
 	fmt.Printf("Looking for coordinates %v and %v\n", latitude, longitude)
 
-
 	client, err := LoadCredentials();
-	if err != nil {
-		fmt.Printf("Error while loading credential: ", err)
-	}
+	errorHandling(err, "Error while loading credential: ", 1)
 
 //	twitterUrl := "https://api.twitter.com/1.1/geo/search.json?lat=" + strconv.FormatFloat(latitude, 'f', 1, 32) + "&long=" + strconv.FormatFloat(longitude, 'f', 1, 32)
 	twitterUrl := "https://api.twitter.com/1.1/geo/reverse_geocode.json?lat=" + strconv.FormatFloat(latitude, 'f', 1, 32) + "&long=" + strconv.FormatFloat(longitude, 'f', 1, 32)
 
 	req, err1 := http.NewRequest("GET", twitterUrl, nil)
-	if err1 != nil {
-		fmt.Printf("Error while creating the request object: ", err1)
-	}
+	errorHandling(err1, "Error while creating the request object: ", 1)
 
 	resp, err2 := client.SendRequest(req)
-	if err2 != nil {
-		fmt.Println("Error while sending the request: ", err2)
-		return
-	}
+	errorHandling(err2, "Error while sending the request: ", 1)
 
 	jsonDataFromHttp, err3 := ioutil.ReadAll(resp.Body)
-	if err3 != nil {
-		fmt.Println("Error while reading response body: ", err3)
-		return
-	}
+	errorHandling(err3, "Error while reading response body: ", 1)
+
 //	fmt.Println(string(jsonDataFromHttp[:]))
 
 	err4 := json.Unmarshal(jsonDataFromHttp, &data)
-	if err4 != nil {
-		fmt.Println("Error while parsing json response: ", err4)
-		return
-	}
+	errorHandling(err4, "Error while parsing json response: ", 1)
 
 	if len(data.Result.Places) >0 {
 		return data.Result.Places[0].Id
@@ -197,10 +170,7 @@ func main() {
 	);
 
 	client, err = LoadCredentials();
-	if err != nil {
-		fmt.Printf("Could not parse CREDENTIALS file: %v\n", err);
-		os.Exit(1);
-	}
+	errorHandling(err, "Could not parse CREDENTIALS file: ", 1)
 
     var toTwet = getFines()
     var image []byte
@@ -215,54 +185,51 @@ func main() {
 
 		placeId := getPlaceId(element.Loc.Coordinates[0], element.Loc.Coordinates[1])
 
-		endpoint := baseendpoint + "?place_id=" + placeId + "&display_coordinates=true"
+		latitude := strconv.FormatFloat(element.Loc.Coordinates[0], 'f', 1, 64)
+		longitude := strconv.FormatFloat(element.Loc.Coordinates[1], 'f', 1, 64)
+
+//		endpoint := baseendpoint + "?place_id=" + placeId + "&display_coordinates=true"
+		endpoint := baseendpoint + "?lat=" + latitude + "&long=" + longitude + "&display_coordinates=true"
 
 		fmt.Printf("Place ID: %v\n", placeId)
 
         image = decode(element.ImageData[22:])
         body, header, err := GetBody(element.Text, image, element.Address, element.CreatedAt, placeId)
 
-        if err != nil {
-            fmt.Printf("Problem loading body: %v\n", err)
-            os.Exit(1)
-        }
+		errorHandling(err, "Problem loading body: ", 1)
 
         req, err = http.NewRequest("POST", endpoint, body)
-        if err != nil {
-            fmt.Printf("Could not parse request: %v\n", err)
-            os.Exit(1)
-        }
+		errorHandling(err, "Could not parse request: ", 1)
+
         req.Header.Set("Content-Type", header)
 
         resp, err = client.SendRequest(req)
-        if err != nil {
-            fmt.Printf("Could not send request: %v\n", err)
-            os.Exit(1)
-        }
+		errorHandling(err, "Could not send request: ", 1)
+
         tweet = &twittergo.Tweet{}
         err = resp.Parse(tweet)
-        if err != nil {
-            fmt.Printf("Problem parsing response: %v\n", err)
-            os.Exit(1)
-        }
+		errorHandling(err, "Problem parsing response: ", 1)
+
         fmt.Printf("ID:                         %v\n", tweet.Id())
         fmt.Printf("Tweet:                      %v\n", tweet.Text())
         fmt.Printf("User:                       %v\n", tweet.User().Name())
 
 		// Mark fine posted on twitter
-//        url1 := "http://beta.timulto.org/api/fine/" + element.Id +  "/twitter"
-//		tId := strconv.FormatUint(tweet.Id(), 10)
-//
-//        parameters := url.Values{}
-//		parameters.Add("postId", tId)
-//		resp1, err1 :=http.PostForm(url1, parameters)
-//
-//        if err1 != nil {
-//            fmt.Println("Problem while marking tweet " + tId + " published.")
-//        } else {
-//			fmt.Println("Tweet " + tId + " marked as published.")
-//		}
-//        _, err1 = ioutil.ReadAll(resp1.Body)
+        url1 := "http://beta.timulto.org/api/fine/" + element.Id +  "/twitter"
+		tId := strconv.FormatUint(tweet.Id(), 10)
+
+        parameters := url.Values{}
+		parameters.Add("postId", tId)
+		resp1, err1 :=http.PostForm(url1, parameters)
+
+        if ! errorHandling(err1, "Problem while marking tweet " + tId + " published", 1)  {
+			fmt.Println("Tweet " + tId + " marked as published.")
+		}
+
+		jsonDataFromHttp, err2 := ioutil.ReadAll(resp1.Body)
+		errorHandling(err2, "Problem while reading response: ", 1)
+
+		fmt.Println(string(jsonDataFromHttp[:]))
 
 //        if resp.HasRateLimit() {
 //            fmt.Printf("Rate limit:                 %v\n", resp.RateLimit())
@@ -279,4 +246,18 @@ func main() {
 //            fmt.Printf("Could not parse media rate limit from response.\n")
 //        }
     }
+}
+
+func errorHandling(err error, msg string, exitCode int)(isError bool) {
+
+	if err != nil {
+		fmt.Println(msg, err)
+		if exitCode == -1 {
+			os.Exit(exitCode)
+		}
+		isError = true
+	} else {
+		isError = false
+	}
+	return
 }
