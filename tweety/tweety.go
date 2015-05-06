@@ -21,9 +21,7 @@ import (
 func LoadCredentials() (client *twittergo.Client, err error) {
 
 	credentials, err := ioutil.ReadFile("CREDENTIALS")
-	if err != nil {
-		return
-	}
+	errorHandling(err, "Error while loading CREDENTIALS file: ", 1)
 
 	lines := strings.Split(string(credentials), "\n");
 	config := &oauth1a.ClientConfig {
@@ -175,6 +173,7 @@ func main() {
     var toTwet = getFines()
     var image []byte
 	baseendpoint := "/1.1/statuses/update_with_media.json"
+//	baseendpoint := "/1.1/statuses/update.json"
 
 	if len(toTwet) == 0 {
 	    fmt.Println("No mew tweet to post")
@@ -185,13 +184,14 @@ func main() {
 
 		placeId := getPlaceId(element.Loc.Coordinates[0], element.Loc.Coordinates[1])
 
-		latitude := strconv.FormatFloat(element.Loc.Coordinates[0], 'f', 1, 64)
-		longitude := strconv.FormatFloat(element.Loc.Coordinates[1], 'f', 1, 64)
+		latitude := strconv.FormatFloat(element.Loc.Coordinates[0], 'f', 1, 32)
+		longitude := strconv.FormatFloat(element.Loc.Coordinates[1], 'f', 1, 32)
 
 //		endpoint := baseendpoint + "?place_id=" + placeId + "&display_coordinates=true"
 		endpoint := baseendpoint + "?lat=" + latitude + "&long=" + longitude + "&display_coordinates=true"
 
-		fmt.Printf("Place ID: %v\n", placeId)
+
+
 
         image = decode(element.ImageData[22:])
         body, header, err := GetBody(element.Text, image, element.Address, element.CreatedAt, placeId)
@@ -210,10 +210,6 @@ func main() {
         err = resp.Parse(tweet)
 		errorHandling(err, "Problem parsing response: ", 1)
 
-        fmt.Printf("ID:                         %v\n", tweet.Id())
-        fmt.Printf("Tweet:                      %v\n", tweet.Text())
-        fmt.Printf("User:                       %v\n", tweet.User().Name())
-
 		// Mark fine posted on twitter
         url1 := "http://beta.timulto.org/api/fine/" + element.Id +  "/twitter"
 		tId := strconv.FormatUint(tweet.Id(), 10)
@@ -226,25 +222,14 @@ func main() {
 			fmt.Println("Tweet " + tId + " marked as published.")
 		}
 
-		jsonDataFromHttp, err2 := ioutil.ReadAll(resp1.Body)
+		_, err2 := ioutil.ReadAll(resp1.Body)
 		errorHandling(err2, "Problem while reading response: ", 1)
 
-		fmt.Println(string(jsonDataFromHttp[:]))
-
-//        if resp.HasRateLimit() {
-//            fmt.Printf("Rate limit:                 %v\n", resp.RateLimit())
-//            fmt.Printf("Rate limit remaining:       %v\n", resp.RateLimitRemaining())
-//            fmt.Printf("Rate limit reset:           %v\n", resp.RateLimitReset())
-//        } else {
-//            fmt.Printf("Could not parse rate limit from response.\n")
-//        }
-//        if resp.HasMediaRateLimit() {
-//            fmt.Printf("Media Rate limit:           %v\n", resp.MediaRateLimit())
-//            fmt.Printf("Media Rate limit remaining: %v\n", resp.MediaRateLimitRemaining())
-//            fmt.Printf("Media Rate limit reset:     %v\n", resp.MediaRateLimitReset())
-//        } else {
-//            fmt.Printf("Could not parse media rate limit from response.\n")
-//        }
+		fmt.Printf("Endpoint ...........%v\n", endpoint)
+		fmt.Printf("Place ID ...........%v\n", placeId)
+		fmt.Printf("ID .................%v\n", tweet.Id())
+		fmt.Printf("Tweet ..............%v\n", tweet.Text())
+		fmt.Printf("User ...............%v\n", tweet.User().Name())
     }
 }
 
