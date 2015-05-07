@@ -182,16 +182,13 @@ func main() {
     for _, element := range toTwet {
 
 
-		placeId := getPlaceId(element.Loc.Coordinates[0], element.Loc.Coordinates[1])
+		placeId := getPlaceId(element.Loc.Coordinates[1], element.Loc.Coordinates[0])
 
-		latitude := strconv.FormatFloat(element.Loc.Coordinates[0], 'f', 1, 32)
-		longitude := strconv.FormatFloat(element.Loc.Coordinates[1], 'f', 1, 32)
+		latitude := strconv.FormatFloat(element.Loc.Coordinates[1], 'f', 7, 32)
+		longitude := strconv.FormatFloat(element.Loc.Coordinates[0], 'f', 7, 32)
 
 //		endpoint := baseendpoint + "?place_id=" + placeId + "&display_coordinates=true"
 		endpoint := baseendpoint + "?lat=" + latitude + "&long=" + longitude + "&display_coordinates=true"
-
-
-
 
         image = decode(element.ImageData[22:])
         body, header, err := GetBody(element.Text, image, element.Address, element.CreatedAt, placeId)
@@ -230,6 +227,8 @@ func main() {
 		fmt.Printf("ID .................%v\n", tweet.Id())
 		fmt.Printf("Tweet ..............%v\n", tweet.Text())
 		fmt.Printf("User ...............%v\n", tweet.User().Name())
+		fmt.Printf("latitude ...........%v\n", latitude)
+		fmt.Printf("longitude ..........%v\n", longitude)
     }
 }
 
