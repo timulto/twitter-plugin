@@ -128,13 +128,13 @@ func getPlaceId(latitude float64, longitude float64) (p string) {
 
 	var data Place
 
-	fmt.Printf("Looking for coordinates %v and %v\n", latitude, longitude)
+	fmt.Printf("Looking for coordinates %v and %v\n\n", latitude, longitude)
 
 	client, err := LoadCredentials();
 	errorHandling(err, "Error while loading credential: ", 1)
 
 //	twitterUrl := "https://api.twitter.com/1.1/geo/search.json?lat=" + strconv.FormatFloat(latitude, 'f', 1, 32) + "&long=" + strconv.FormatFloat(longitude, 'f', 1, 32)
-	twitterUrl := "https://api.twitter.com/1.1/geo/reverse_geocode.json?lat=" + strconv.FormatFloat(latitude, 'f', 1, 32) + "&long=" + strconv.FormatFloat(longitude, 'f', 1, 32)
+	twitterUrl := "https://api.twitter.com/1.1/geo/reverse_geocode.json?lat=" + strconv.FormatFloat(latitude, 'f', 7, 32) + "&long=" + strconv.FormatFloat(longitude, 'f', 7, 32)
 
 	req, err1 := http.NewRequest("GET", twitterUrl, nil)
 	errorHandling(err1, "Error while creating the request object: ", 1)
@@ -181,7 +181,7 @@ func main() {
 
     for _, element := range toTwet {
 
-
+                fmt.Println("------------------------------------------------------------------------------------")
 		placeId := getPlaceId(element.Loc.Coordinates[1], element.Loc.Coordinates[0])
 
 		latitude := strconv.FormatFloat(element.Loc.Coordinates[1], 'f', 7, 32)
@@ -229,6 +229,7 @@ func main() {
 		fmt.Printf("User ...............%v\n", tweet.User().Name())
 		fmt.Printf("latitude ...........%v\n", latitude)
 		fmt.Printf("longitude ..........%v\n", longitude)
+                fmt.Println("------------------------------------------------------------------------------------\n\n")
     }
 }
 
