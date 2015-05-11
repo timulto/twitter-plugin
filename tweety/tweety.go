@@ -16,20 +16,55 @@ import (
 	"encoding/json"
     "encoding/base64"
 	"strconv"
+	"crypto/md5"
+	"crypto/hmac"
+	"errors"
 )
+
+const CONSUMER_KEY = "CONSUMER_KEY"
+const CONSUMER_SECRET = "CONSUMER_SECRET"
+const ACCESS_TOKEN = "ACCESS_TOKEN"
+const ACCESS_TOKEN_SECRET = "ACCESS_TOKEN_SECRET"
+
+var (
+	client *twittergo.Client
+	auth string = "false"
+
+)
+
 
 func LoadCredentials() (client *twittergo.Client, err error) {
 
-	credentials, err := ioutil.ReadFile("CREDENTIALS")
-	errorHandling(err, "Error while loading CREDENTIALS file: ", 1)
+	consumerKey := os.Getenv(CONSUMER_KEY)
+	consumerSecret := os.Getenv(CONSUMER_SECRET)
+	accessToken := os.Getenv(ACCESS_TOKEN)
+	accessTokenSecret := os.Getenv(ACCESS_TOKEN_SECRET)
 
-	lines := strings.Split(string(credentials), "\n");
-	config := &oauth1a.ClientConfig {
-		ConsumerKey:    lines[0],
-		ConsumerSecret: lines[1],
+	if consumerKey != "" && consumerSecret != "" && accessToken != "" && accessTokenSecret != "" {
+		fmt.Printf("Credentials loaded using environment variable\n")
+	} else {
+		fmt.Printf("No environment variable found\n")
+		fmt.Printf("Tryng with CREDENTIAL file...\n")
+
+		credentials, err := ioutil.ReadFile("CREDENTIALS")
+		errorHandling(err, "Error while loading CREDENTIALS file: ", 1)
+
+		fmt.Printf("Credentials loaded using CREDENTIAL file\n")
+
+		lines := strings.Split(string(credentials), "\n");
+
+		consumerKey = lines[0]
+		consumerSecret = lines[1]
+		accessToken = lines[2]
+		accessTokenSecret = lines[3]
 	}
 
-	user := oauth1a.NewAuthorizedConfig(lines[2], lines[3]);
+	config := &oauth1a.ClientConfig {
+		ConsumerKey:    consumerKey,
+		ConsumerSecret: consumerSecret,
+	}
+
+	user := oauth1a.NewAuthorizedConfig(accessToken, accessTokenSecret);
 	client = twittergo.NewClient(config, user);
 
 	return
@@ -124,13 +159,16 @@ type Place struct {
 
 func getPlaceId(latitude float64, longitude float64) (p string) {
 
-	var client *twittergo.Client
-
+	//var client *twittergo.Client
+	var err error
 	var data Place
 
 	fmt.Printf("Looking for coordinates %v and %v\n\n", latitude, longitude)
 
-	client, err := LoadCredentials();
+	if client == nil {
+		client, err = LoadCredentials();
+	}
+
 	errorHandling(err, "Error while loading credential: ", 1)
 
 //	twitterUrl := "https://api.twitter.com/1.1/geo/search.json?lat=" + strconv.FormatFloat(latitude, 'f', 1, 32) + "&long=" + strconv.FormatFloat(longitude, 'f', 1, 32)
@@ -159,16 +197,35 @@ func getPlaceId(latitude float64, longitude float64) (p string) {
 
 func main() {
 
+	if len(os.Args) < 2 {
+		errorHandling(errors.New("Invalid number of arguments"), "Error: ", 1)
+	}
+
+//	if os.Args[2] == "true" {
+//		auth = "tue"
+//	}
+
+	if os.Args[1] == "batch" {
+		fmt.Println("Running in batch mode")
+		publish(nil, nil)
+	} else {
+		fmt.Println("Running in server mode")
+		http.HandleFunc("/publish", publish)
+		http.ListenAndServe("localhost:8000", nil)
+	}
+}
+
+func publish(w http.ResponseWriter, r *http.Request) {
+
     var (
-		err    error
-		client *twittergo.Client
 		req    *http.Request
 		resp   *twittergo.APIResponse
 		tweet  *twittergo.Tweet
 	);
 
-	client, err = LoadCredentials();
-	errorHandling(err, "Could not parse CREDENTIALS file: ", 1)
+	if client == nil {
+		client, _ = LoadCredentials();
+	}
 
     var toTwet = getFines()
     var image []byte
@@ -177,11 +234,14 @@ func main() {
 
 	if len(toTwet) == 0 {
 	    fmt.Println("No mew tweet to post")
+		if w != nil {
+			io.WriteString(w, "No mew tweet to post\n")
+		}
 	}
 
     for _, element := range toTwet {
 
-                fmt.Println("------------------------------------------------------------------------------------")
+
 		placeId := getPlaceId(element.Loc.Coordinates[1], element.Loc.Coordinates[0])
 
 		latitude := strconv.FormatFloat(element.Loc.Coordinates[1], 'f', 7, 32)
@@ -221,7 +281,7 @@ func main() {
 
 		_, err2 := ioutil.ReadAll(resp1.Body)
 		errorHandling(err2, "Problem while reading response: ", 1)
-
+		fmt.Println("------------------------------------------------------------------------------------")
 		fmt.Printf("Endpoint ...........%v\n", endpoint)
 		fmt.Printf("Place ID ...........%v\n", placeId)
 		fmt.Printf("ID .................%v\n", tweet.Id())
@@ -229,7 +289,19 @@ func main() {
 		fmt.Printf("User ...............%v\n", tweet.User().Name())
 		fmt.Printf("latitude ...........%v\n", latitude)
 		fmt.Printf("longitude ..........%v\n", longitude)
-                fmt.Println("------------------------------------------------------------------------------------\n\n")
+		fmt.Println("------------------------------------------------------------------------------------\n\n")
+
+		if w != nil && r != nil {
+			io.WriteString(w, "------------------------------------------------------------------------------------\n")
+			io.WriteString(w, "Endpoint ..........." + endpoint + "\n")
+			io.WriteString(w, "Place ID............" + placeId + "\n")
+			io.WriteString(w, "ID ................." + fmt.Sprintf("%v", tweet.Id()) + "\n")
+			io.WriteString(w, "Tweet .............." + tweet.Text() + "\n")
+			io.WriteString(w, "User ..............." + tweet.User().Name() + "\n")
+			io.WriteString(w, "latitude ..........." + latitude + "\n")
+			io.WriteString(w, "longitude .........." + longitude + "\n")
+			io.WriteString(w, "------------------------------------------------------------------------------------\n\n")
+		}
     }
 }
 
@@ -245,4 +317,17 @@ func errorHandling(err error, msg string, exitCode int)(isError bool) {
 		isError = false
 	}
 	return
+}
+
+func encHmacMD5 (token string, key string) string{
+
+	t := []byte(token)
+	k := []byte(key)
+
+	h := hmac.New(md5.New, k)
+	h.Write(t)
+	sum := fmt.Sprintf("%x", h.Sum(nil))
+	fmt.Printf("SUM: %v\n", sum)
+
+	return sum
 }
