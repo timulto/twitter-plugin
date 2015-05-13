@@ -25,11 +25,15 @@ const CONSUMER_KEY = "CONSUMER_KEY"
 const CONSUMER_SECRET = "CONSUMER_SECRET"
 const ACCESS_TOKEN = "ACCESS_TOKEN"
 const ACCESS_TOKEN_SECRET = "ACCESS_TOKEN_SECRET"
+const HMAC_KEY = "HMAC_KEY"
+
+
+const APP_NAME = "twitter-plugin"
 
 var (
 	client *twittergo.Client
 	auth string = "false"
-
+	hmacKey string
 )
 
 
@@ -39,6 +43,7 @@ func LoadCredentials() (client *twittergo.Client, err error) {
 	consumerSecret := os.Getenv(CONSUMER_SECRET)
 	accessToken := os.Getenv(ACCESS_TOKEN)
 	accessTokenSecret := os.Getenv(ACCESS_TOKEN_SECRET)
+	hmacKey = os.Getenv(HMAC_KEY)
 
 	if consumerKey != "" && consumerSecret != "" && accessToken != "" && accessTokenSecret != "" {
 		fmt.Printf("Credentials loaded using environment variable\n")
@@ -57,6 +62,7 @@ func LoadCredentials() (client *twittergo.Client, err error) {
 		consumerSecret = lines[1]
 		accessToken = lines[2]
 		accessTokenSecret = lines[3]
+		hmacKey = lines[4]
 	}
 
 	config := &oauth1a.ClientConfig {
@@ -111,7 +117,7 @@ type location struct {
 type Fine struct {
     Id string `json:"_id"`
     Address string
-    Approved int
+    Approved bool
     Category string
     CreatedAt string
     ImageData string
@@ -121,8 +127,24 @@ type Fine struct {
 
 func getFines() (data []Fine) {
 
+	t := time.Now().Local()
+	tstamp := t.Format("20060102150405")
+	toEncode := tstamp + "#" + APP_NAME + "#" + "twitter"
+	token := encHmacMD5(toEncode, hmacKey)
+
+	fmt.Printf("timestamp: %v\n", tstamp)
+	fmt.Printf("app: %v\n", APP_NAME)
+	fmt.Printf("token: %v\n", token)
+
     timultoUrl := "http://beta.timulto.org/api/fines/twitter"
-    resp, err := http.Get(timultoUrl)
+	req, _ := http.NewRequest("GET", timultoUrl, nil)
+	req.Header.Add("timestamp", tstamp)
+	req.Header.Add("app", hmacKey)
+	req.Header.Add("token", token)
+	client := &http.Client{}
+	resp, err := client.Do(req)
+
+    //resp, err := http.Get(timultoUrl)
 	errorHandling(err, "Error while requesting data: ", 1)
 
     jsonDataFromHttp, err := ioutil.ReadAll(resp.Body)
@@ -275,11 +297,29 @@ func publish(w http.ResponseWriter, r *http.Request) {
 		parameters.Add("postId", tId)
 		resp1, err1 :=http.PostForm(url1, parameters)
 
+//		t := time.Now().Local()
+//		tstamp := t.Format("20060102150405")
+//		toEncode := tstamp + "#" + APP_NAME + "#" + "twitter"
+//		token := encHmacMD5(toEncode, hmacKey)
+//
+//		fmt.Printf("timestamp: %v\n", tstamp)
+//		fmt.Printf("app: %v\n", APP_NAME)
+//		fmt.Printf("token: %v\n", token)
+//
+//		req, _ := http.NewRequest("POST", url1, bytes.NewBufferString(parameters.Encode()))
+//		req.Header.Add("timestamp", tstamp)
+//		req.Header.Add("app", hmacKey)
+//		req.Header.Add("token", token)
+//		client := &http.Client{}
+//		resp1, err1 := client.Do(req)
+
         if ! errorHandling(err1, "Problem while marking tweet " + tId + " published", 1)  {
 			fmt.Println("Tweet " + tId + " marked as published.")
 		}
 
-		_, err2 := ioutil.ReadAll(resp1.Body)
+
+		r, err2 := ioutil.ReadAll(resp1.Body)
+		//fmt.Printf("Body: %v", string(r[:]))
 		errorHandling(err2, "Problem while reading response: ", 1)
 		fmt.Println("------------------------------------------------------------------------------------")
 		fmt.Printf("Endpoint ...........%v\n", endpoint)
@@ -327,7 +367,7 @@ func encHmacMD5 (token string, key string) string{
 	h := hmac.New(md5.New, k)
 	h.Write(t)
 	sum := fmt.Sprintf("%x", h.Sum(nil))
-	fmt.Printf("SUM: %v\n", sum)
+	//fmt.Printf("SUM: %v\n", sum)
 
 	return sum
 }
