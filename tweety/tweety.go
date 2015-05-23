@@ -16,9 +16,10 @@ import (
 	"encoding/json"
     "encoding/base64"
 	"strconv"
-	"crypto/md5"
-	"crypto/hmac"
+//	"crypto/md5"
+//	"crypto/hmac"
 	"errors"
+	//"net"
 )
 
 const CONSUMER_KEY = "CONSUMER_KEY"
@@ -28,12 +29,14 @@ const ACCESS_TOKEN_SECRET = "ACCESS_TOKEN_SECRET"
 const HMAC_KEY = "HMAC_KEY"
 
 
-const APP_NAME = "twitter-plugin"
+const APP_NAME = "twitter"
 
 var (
 	client *twittergo.Client
 	auth string = "false"
 	hmacKey string
+	timerRange string
+	//doneChan chan(bool)
 )
 
 
@@ -52,7 +55,7 @@ func LoadCredentials() (client *twittergo.Client, err error) {
 		fmt.Printf("Tryng with CREDENTIAL file...\n")
 
 		credentials, err := ioutil.ReadFile("CREDENTIALS")
-		errorHandling(err, "Error while loading CREDENTIALS file: ", 1)
+		ErrorHandling(err, "Error while loading CREDENTIALS file: ", 1)
 
 		fmt.Printf("Credentials loaded using CREDENTIAL file\n")
 
@@ -101,7 +104,7 @@ func GetBody(message string, media []byte, address string, createdAt string, pla
 //	mp.WriteField("place_id", placeId)
 
 	writer, err = mp.CreateFormField("media[]")
-	errorHandling(err, "Error while creating writer: ", 1)
+	ErrorHandling(err, "Error while creating writer: ", 1)
 
 	writer.Write(media)
 	header = fmt.Sprintf("multipart/form-data;boundary=%v", mp.Boundary())
@@ -123,38 +126,6 @@ type Fine struct {
     ImageData string
     Loc location
     Text string
-}
-
-func getFines() (data []Fine) {
-
-	t := time.Now().Local()
-	tstamp := t.Format("20060102150405")
-	toEncode := tstamp + "#" + APP_NAME + "#" + "twitter"
-	token := encHmacMD5(toEncode, hmacKey)
-
-	fmt.Printf("timestamp: %v\n", tstamp)
-	fmt.Printf("app: %v\n", APP_NAME)
-	fmt.Printf("token: %v\n", token)
-
-    timultoUrl := "http://beta.timulto.org/api/fines/twitter"
-	req, _ := http.NewRequest("GET", timultoUrl, nil)
-	req.Header.Add("timestamp", tstamp)
-	req.Header.Add("app", hmacKey)
-	req.Header.Add("token", token)
-	client := &http.Client{}
-	resp, err := client.Do(req)
-
-    //resp, err := http.Get(timultoUrl)
-	errorHandling(err, "Error while requesting data: ", 1)
-
-    jsonDataFromHttp, err := ioutil.ReadAll(resp.Body)
-	errorHandling(err, "Error while parsing body: ", 1)
-
-    //data []Fine
-    err = json.Unmarshal(jsonDataFromHttp, &data)
-	errorHandling(err, "Error while unmarshalling fines: ", 1)
-
-    return
 }
 
 func decode(str string) (data []byte){
@@ -181,7 +152,6 @@ type Place struct {
 
 func getPlaceId(latitude float64, longitude float64) (p string) {
 
-	//var client *twittergo.Client
 	var err error
 	var data Place
 
@@ -191,24 +161,21 @@ func getPlaceId(latitude float64, longitude float64) (p string) {
 		client, err = LoadCredentials();
 	}
 
-	errorHandling(err, "Error while loading credential: ", 1)
+	ErrorHandling(err, "Error while loading credential: ", 1)
 
-//	twitterUrl := "https://api.twitter.com/1.1/geo/search.json?lat=" + strconv.FormatFloat(latitude, 'f', 1, 32) + "&long=" + strconv.FormatFloat(longitude, 'f', 1, 32)
 	twitterUrl := "https://api.twitter.com/1.1/geo/reverse_geocode.json?lat=" + strconv.FormatFloat(latitude, 'f', 7, 32) + "&long=" + strconv.FormatFloat(longitude, 'f', 7, 32)
 
 	req, err1 := http.NewRequest("GET", twitterUrl, nil)
-	errorHandling(err1, "Error while creating the request object: ", 1)
+	ErrorHandling(err1, "Error while creating the request object: ", 1)
 
 	resp, err2 := client.SendRequest(req)
-	errorHandling(err2, "Error while sending the request: ", 1)
+	ErrorHandling(err2, "Error while sending the request: ", 1)
 
 	jsonDataFromHttp, err3 := ioutil.ReadAll(resp.Body)
-	errorHandling(err3, "Error while reading response body: ", 1)
-
-//	fmt.Println(string(jsonDataFromHttp[:]))
+	ErrorHandling(err3, "Error while reading response body: ", 1)
 
 	err4 := json.Unmarshal(jsonDataFromHttp, &data)
-	errorHandling(err4, "Error while parsing json response: ", 1)
+	ErrorHandling(err4, "Error while parsing json response: ", 1)
 
 	if len(data.Result.Places) >0 {
 		return data.Result.Places[0].Id
@@ -220,20 +187,31 @@ func getPlaceId(latitude float64, longitude float64) (p string) {
 func main() {
 
 	if len(os.Args) < 2 {
-		errorHandling(errors.New("Invalid number of arguments"), "Error: ", 1)
+		ErrorHandling(errors.New("Invalid number of arguments"), "Error: ", 1)
 	}
 
-//	if os.Args[2] == "true" {
-//		auth = "tue"
-//	}
+	if len(os.Args) == 3 {
+		timerRange = os.Args[2]
+	}
 
 	if os.Args[1] == "batch" {
 		fmt.Println("Running in batch mode")
-		publish(nil, nil)
-	} else {
+		if timerRange == "" {
+			publish(nil, nil)
+		} else {
+			StartTriggeringBatch(timerRange)
+		}
+
+	} else if os.Args[1] == "server" {
 		fmt.Println("Running in server mode")
 		http.HandleFunc("/publish", publish)
+		http.HandleFunc("/startTicker", StartTriggering)
+		http.HandleFunc("/stopTicker", StopTicker)
+		http.HandleFunc("/", GetInfo)
 		http.ListenAndServe("localhost:8000", nil)
+		fmt.Println("Listening on port 8000")
+	} else {
+		ErrorHandling(errors.New("Invalid argument, valid optins are 'batch' or 'server'"), "Error: ", 1)
 	}
 }
 
@@ -249,10 +227,9 @@ func publish(w http.ResponseWriter, r *http.Request) {
 		client, _ = LoadCredentials();
 	}
 
-    var toTwet = getFines()
+    var toTwet = GetFines()
     var image []byte
 	baseendpoint := "/1.1/statuses/update_with_media.json"
-//	baseendpoint := "/1.1/statuses/update.json"
 
 	if len(toTwet) == 0 {
 	    fmt.Println("No mew tweet to post")
@@ -262,7 +239,6 @@ func publish(w http.ResponseWriter, r *http.Request) {
 	}
 
     for _, element := range toTwet {
-
 
 		placeId := getPlaceId(element.Loc.Coordinates[1], element.Loc.Coordinates[0])
 
@@ -275,52 +251,59 @@ func publish(w http.ResponseWriter, r *http.Request) {
         image = decode(element.ImageData[22:])
         body, header, err := GetBody(element.Text, image, element.Address, element.CreatedAt, placeId)
 
-		errorHandling(err, "Problem loading body: ", 1)
+		ErrorHandling(err, "Problem loading body: ", 1)
 
         req, err = http.NewRequest("POST", endpoint, body)
-		errorHandling(err, "Could not parse request: ", 1)
+		ErrorHandling(err, "Could not parse request: ", 1)
 
         req.Header.Set("Content-Type", header)
 
         resp, err = client.SendRequest(req)
-		errorHandling(err, "Could not send request: ", 1)
+		ErrorHandling(err, "Could not send request: ", 1)
 
-        tweet = &twittergo.Tweet{}
-        err = resp.Parse(tweet)
-		errorHandling(err, "Problem parsing response: ", 1)
+		tweet = &twittergo.Tweet{}
+		err = resp.Parse(tweet)
+		ErrorHandling(err, "Problem parsing response: ", 1)
 
 		// Mark fine posted on twitter
-        url1 := "http://beta.timulto.org/api/fine/" + element.Id +  "/twitter"
+		url1 := "http://beta.timulto.org/api/fine/" + element.Id +  "/twitter"
 		tId := strconv.FormatUint(tweet.Id(), 10)
 
-        parameters := url.Values{}
+		parameters := url.Values{}
 		parameters.Add("postId", tId)
-		resp1, err1 :=http.PostForm(url1, parameters)
+//		resp1, err1 := http.PostForm(url1, parameters)
 
-//		t := time.Now().Local()
-//		tstamp := t.Format("20060102150405")
-//		toEncode := tstamp + "#" + APP_NAME + "#" + "twitter"
-//		token := encHmacMD5(toEncode, hmacKey)
-//
-//		fmt.Printf("timestamp: %v\n", tstamp)
-//		fmt.Printf("app: %v\n", APP_NAME)
-//		fmt.Printf("token: %v\n", token)
-//
-//		req, _ := http.NewRequest("POST", url1, bytes.NewBufferString(parameters.Encode()))
-//		req.Header.Add("timestamp", tstamp)
-//		req.Header.Add("app", hmacKey)
-//		req.Header.Add("token", token)
-//		client := &http.Client{}
-//		resp1, err1 := client.Do(req)
+		t := time.Now().Local()
+		tstamp := t.Format("20060102150405")
+		toEncode := tstamp + "#" + APP_NAME + "#" + "twitter" + "#" + tId
+		token := EncHmacMD5(toEncode, hmacKey)
 
-        if ! errorHandling(err1, "Problem while marking tweet " + tId + " published", 1)  {
-			fmt.Println("Tweet " + tId + " marked as published.")
+		fmt.Printf("timestamp: %v\n", tstamp)
+		fmt.Printf("app: %v\n", APP_NAME)
+		fmt.Printf("token: %v\n", toEncode)
+		fmt.Printf("tweet id: %v\n", tId)
+		fmt.Printf("secret: %v\n", hmacKey)
+
+		req, _ := http.NewRequest("POST", url1, bytes.NewBufferString(parameters.Encode()))
+		req.Header.Add("timestamp", tstamp)
+		req.Header.Add("app", APP_NAME)
+		req.Header.Add("token", token)
+		client := &http.Client{}
+		resp1, err1 := client.Do(req)
+
+		ErrorHandling(err1, "Problem while marking tweet " + tId + " published", 1)
+
+//		r, err2 := ioutil.ReadAll(resp1.Body)
+//		ErrorHandling(err2, "Problem while reading response: ", 1)
+
+		respCode := resp1.StatusCode
+		fmt.Printf("Resp Code: %v\n", respCode)
+		if respCode != 200 {
+//			fmt.Println("Error: " + fmt.Sprintf("%s", r))
+			ErrorHandling(errors.New("Error while trying to mark tweet as red"), "Error: ", 1)
 		}
+		fmt.Println("Tweet " + tId + " marked as published.")
 
-
-		r, err2 := ioutil.ReadAll(resp1.Body)
-		//fmt.Printf("Body: %v", string(r[:]))
-		errorHandling(err2, "Problem while reading response: ", 1)
 		fmt.Println("------------------------------------------------------------------------------------")
 		fmt.Printf("Endpoint ...........%v\n", endpoint)
 		fmt.Printf("Place ID ...........%v\n", placeId)
@@ -345,29 +328,22 @@ func publish(w http.ResponseWriter, r *http.Request) {
     }
 }
 
-func errorHandling(err error, msg string, exitCode int)(isError bool) {
 
-	if err != nil {
-		fmt.Println(msg, err)
-		if exitCode == -1 {
-			os.Exit(exitCode)
-		}
-		isError = true
-	} else {
-		isError = false
-	}
-	return
-}
-
-func encHmacMD5 (token string, key string) string{
-
-	t := []byte(token)
-	k := []byte(key)
-
-	h := hmac.New(md5.New, k)
-	h.Write(t)
-	sum := fmt.Sprintf("%x", h.Sum(nil))
-	//fmt.Printf("SUM: %v\n", sum)
-
-	return sum
-}
+//func getIpAddress () string {
+//
+//	var toRet string
+//
+//	host, _ := os.Hostname()
+//	addrs, _ := net.LookupIP(host)
+//
+//	for _, addr := range addrs {
+//		if ipv4 := addr.To4(); ipv4 != nil {
+//			if toRet == "" {
+//				toRet = string(ipv4[:])
+//			}
+//			//fmt.Println("IPv4: ", ipv4)
+//		}
+//	}
+//	fmt.Println("IPv4: " + toRet)
+//	return toRet
+//}
