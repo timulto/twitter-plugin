@@ -37,8 +37,24 @@ var (
 	hmacKey string
 	timerRange string
 	//doneChan chan(bool)
+	category map[string]string
 )
 
+func loadCategory() {
+
+	category = map[string]string {
+		"PRC": "Parcheggio incivile",
+		"RFT": "Rifiuti o cassonetti sporchi",
+		"ACC": "Accessibilità scarsa o mancante",
+		"ABS": "Abusivismo",
+		"DST": "Disturbo della quiete pubblica",
+		"ILL": "Illuminazione",
+		"MNT": "Manto stradale",
+		"VND": "Atti vandalici",
+		"SGN": "Segnaletica mancante",
+		"MLT": "Maltrattamento animali",
+	}
+}
 
 func LoadCredentials() (client *twittergo.Client, err error) {
 
@@ -79,7 +95,7 @@ func LoadCredentials() (client *twittergo.Client, err error) {
 	return
 }
 
-func GetBody(message string, media []byte, address string, createdAt string, placeId string) (body io.ReadWriter, header string, err error) {
+func GetBody(message string, media []byte, address string, createdAt string, placeId string, city string, cat string) (body io.ReadWriter, header string, err error) {
 	var (
 		mp *multipart.Writer
 		//media  []byte
@@ -94,11 +110,28 @@ func GetBody(message string, media []byte, address string, createdAt string, pla
     t1 := t.Format(time.RFC822)
 	t1 = t1[0:len(t1)-3]
 
+	msg = fmt.Sprintf("%v", t1) + " - " + category[cat] + " -"
 	if message != "" {
-	    msg = fmt.Sprintf("%v", t1) + " '" +  message + "'" + " In " + address
-	} else {
-		msg = fmt.Sprintf("%v", t1) + " In " + address
+	    msg += " '" +  message + "'"
 	}
+	msg += " In " + address
+
+	if cat == "PRC" || cat == "DST" {
+		if city == "rome" || city == "roma" {
+			msg += " - @plromacapitale @fajelamulta @romamigliore"
+		}
+	}
+	if cat == "RTF" {
+		if city == "rome" || city == "roma" {
+			msg += " - #AMARoma"
+		}
+	}
+	if cat == "ABS" || cat == "ILL" || cat == "MNT" || cat == "VND" || cat == "SGN" || cat == "DST" || cat == "RFT" {
+		if city == "rome" || city == "roma" {
+			msg += " - @Retake_Roma @romafaschifo"
+		}
+	}
+
 
 	mp.WriteField("status", fmt.Sprintf(msg))
 //	mp.WriteField("place_id", placeId)
@@ -120,6 +153,7 @@ type location struct {
 type Fine struct {
     Id string `json:"_id"`
     Address string
+	City string
     Approved bool
     Category string
     CreatedAt string
@@ -190,6 +224,8 @@ func main() {
 		ErrorHandling(errors.New("Invalid number of arguments"), "Error: ", 1)
 	}
 
+	loadCategory()
+
 	if len(os.Args) == 3 {
 		timerRange = os.Args[2]
 	}
@@ -237,7 +273,6 @@ func publish(w http.ResponseWriter, r *http.Request) {
 			io.WriteString(w, "No mew tweet to post\n")
 		}
 	}
-	fmt.Printf("toTweet: %v\n", len(toTwet))
 
     for _, element := range toTwet {
 
@@ -246,11 +281,10 @@ func publish(w http.ResponseWriter, r *http.Request) {
 		latitude := strconv.FormatFloat(element.Loc.Coordinates[1], 'f', 7, 32)
 		longitude := strconv.FormatFloat(element.Loc.Coordinates[0], 'f', 7, 32)
 
-//		endpoint := baseendpoint + "?place_id=" + placeId + "&display_coordinates=true"
 		endpoint := baseendpoint + "?lat=" + latitude + "&long=" + longitude + "&display_coordinates=true"
 
         image = decode(element.ImageData[22:])
-        body, header, err := GetBody(element.Text, image, element.Address, element.CreatedAt, placeId)
+        body, header, err := GetBody(element.Text, image, element.Address, element.CreatedAt, placeId, strings.ToLower(element.City), element.Category)
 
 		ErrorHandling(err, "Problem loading body: ", 1)
 
@@ -271,7 +305,6 @@ func publish(w http.ResponseWriter, r *http.Request) {
 		resource := "/api/fine/" + element.Id +  "/twitter"
 
 		tId := strconv.FormatUint(tweet.Id(), 10)
-//		tId := "1234567890"
 
 		parameters := url.Values{}
 		parameters.Add("postId", tId)
@@ -285,20 +318,12 @@ func publish(w http.ResponseWriter, r *http.Request) {
 		toEncode := tstamp + "#" + APP_NAME + "#" + "twitter" + "#" + element.Id
 		token := EncHmacMD5(toEncode, hmacKey)
 
-		fmt.Printf("timestamp: %v\n", tstamp)
-		fmt.Printf("app: %v\n", APP_NAME)
-		fmt.Printf("token: %v\n", toEncode)
-		fmt.Printf("tweet id: %v\n", tId)
-		fmt.Printf("secret: %v\n", hmacKey)
-		fmt.Printf("encoded: %v\n", token)
-
 		req, _ := http.NewRequest("POST", urlStr, bytes.NewBufferString(parameters.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		req.Header.Add("Content-Length", strconv.Itoa(len(parameters.Encode())))
 		req.Header.Add("timestamp", tstamp)
 		req.Header.Add("app", APP_NAME)
 		req.Header.Add("token", token)
-
 
 		client := &http.Client{}
 		resp1, err1 := client.Do(req)
@@ -314,7 +339,7 @@ func publish(w http.ResponseWriter, r *http.Request) {
 			fmt.Println("Error: " + fmt.Sprintf("%s", r))
 			ErrorHandling(errors.New("Error while trying to mark tweet as red"), "Error: ", 1)
 		}
-		fmt.Println("Response Body: \n" + fmt.Sprintf("%s", r))
+//		fmt.Println("Response Body: \n" + fmt.Sprintf("%s", r))
 
 		fmt.Println("Tweet " + tId + " marked as published.")
 

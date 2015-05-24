@@ -62,7 +62,7 @@ func StartTriggering(w http.ResponseWriter, r *http.Request) {
 	//doneChan = make(chan bool)
 
 	go func() {
-		fmt.Println("go func")
+		fmt.Println("waiting for next publishing....")
 		for t := range ticker.C {
 			publish(nil, nil)
 			if w != nil {
@@ -89,7 +89,7 @@ func StartTriggeringBatch(timerRange string) {
 
 	go func() {
 		publish(nil, nil)
-		fmt.Println("go func")
+		fmt.Println("waiting for next publishing....")
 		for t := range ticker.C {
 			publish(nil, nil)
 			fmt.Printf("Published at: %v\n", t)
