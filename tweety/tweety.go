@@ -237,6 +237,7 @@ func publish(w http.ResponseWriter, r *http.Request) {
 			io.WriteString(w, "No mew tweet to post\n")
 		}
 	}
+	fmt.Printf("toTweet: %v\n", len(toTwet))
 
     for _, element := range toTwet {
 
@@ -266,12 +267,18 @@ func publish(w http.ResponseWriter, r *http.Request) {
 		ErrorHandling(err, "Problem parsing response: ", 1)
 
 		// Mark fine posted on twitter
-		url1 := "http://beta.timulto.org/api/fine/" + element.Id +  "/twitter"
+		url1 := "http://beta.timulto.org"
+		resource := "/api/fine/" + element.Id +  "/twitter"
+
 		tId := strconv.FormatUint(tweet.Id(), 10)
 //		tId := "1234567890"
 
 		parameters := url.Values{}
 		parameters.Add("postId", tId)
+
+		u, _ := url.ParseRequestURI(url1)
+		u.Path = resource
+		urlStr := fmt.Sprintf("%v", u)
 
 		t := time.Now().Local()
 		tstamp := t.Format("20060102150405")
@@ -285,10 +292,14 @@ func publish(w http.ResponseWriter, r *http.Request) {
 		fmt.Printf("secret: %v\n", hmacKey)
 		fmt.Printf("encoded: %v\n", token)
 
-		req, _ := http.NewRequest("POST", url1, bytes.NewBufferString(parameters.Encode()))
+		req, _ := http.NewRequest("POST", urlStr, bytes.NewBufferString(parameters.Encode()))
+		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Add("Content-Length", strconv.Itoa(len(parameters.Encode())))
 		req.Header.Add("timestamp", tstamp)
 		req.Header.Add("app", APP_NAME)
 		req.Header.Add("token", token)
+
+
 		client := &http.Client{}
 		resp1, err1 := client.Do(req)
 
