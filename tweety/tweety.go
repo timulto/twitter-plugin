@@ -268,14 +268,14 @@ func publish(w http.ResponseWriter, r *http.Request) {
 		// Mark fine posted on twitter
 		url1 := "http://beta.timulto.org/api/fine/" + element.Id +  "/twitter"
 		tId := strconv.FormatUint(tweet.Id(), 10)
+//		tId := "1234567890"
 
 		parameters := url.Values{}
 		parameters.Add("postId", tId)
-//		resp1, err1 := http.PostForm(url1, parameters)
 
 		t := time.Now().Local()
 		tstamp := t.Format("20060102150405")
-		toEncode := tstamp + "#" + APP_NAME + "#" + "twitter" + "#" + tId
+		toEncode := tstamp + "#" + APP_NAME + "#" + "twitter" + "#" + element.Id
 		token := EncHmacMD5(toEncode, hmacKey)
 
 		fmt.Printf("timestamp: %v\n", tstamp)
@@ -283,6 +283,7 @@ func publish(w http.ResponseWriter, r *http.Request) {
 		fmt.Printf("token: %v\n", toEncode)
 		fmt.Printf("tweet id: %v\n", tId)
 		fmt.Printf("secret: %v\n", hmacKey)
+		fmt.Printf("encoded: %v\n", token)
 
 		req, _ := http.NewRequest("POST", url1, bytes.NewBufferString(parameters.Encode()))
 		req.Header.Add("timestamp", tstamp)
@@ -293,15 +294,17 @@ func publish(w http.ResponseWriter, r *http.Request) {
 
 		ErrorHandling(err1, "Problem while marking tweet " + tId + " published", 1)
 
-//		r, err2 := ioutil.ReadAll(resp1.Body)
-//		ErrorHandling(err2, "Problem while reading response: ", 1)
+		r, err2 := ioutil.ReadAll(resp1.Body)
+		ErrorHandling(err2, "Problem while reading response: ", 1)
 
 		respCode := resp1.StatusCode
 		fmt.Printf("Resp Code: %v\n", respCode)
 		if respCode != 200 {
-//			fmt.Println("Error: " + fmt.Sprintf("%s", r))
+			fmt.Println("Error: " + fmt.Sprintf("%s", r))
 			ErrorHandling(errors.New("Error while trying to mark tweet as red"), "Error: ", 1)
 		}
+		fmt.Println("Response Body: \n" + fmt.Sprintf("%s", r))
+
 		fmt.Println("Tweet " + tId + " marked as published.")
 
 		fmt.Println("------------------------------------------------------------------------------------")

@@ -42,5 +42,6 @@ func GetFines() (data []Fine) {
 	err = json.Unmarshal(jsonDataFromHttp, &data)
 	ErrorHandling(err, "Error while unmarshalling fines: ", 1)
 
+	fmt.Printf("Found %v Fines....\n", len(data))
 	return
 }
