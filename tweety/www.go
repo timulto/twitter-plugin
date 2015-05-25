@@ -5,6 +5,8 @@ import (
 	"io"
 	"time"
 	"fmt"
+	"net"
+	"os"
 
 )
 
@@ -62,6 +64,7 @@ func StartTriggering(w http.ResponseWriter, r *http.Request) {
 	//doneChan = make(chan bool)
 
 	go func() {
+		publish(nil, nil)
 		fmt.Println("waiting for next publishing....")
 		for t := range ticker.C {
 			publish(nil, nil)
@@ -85,7 +88,7 @@ func StartTriggeringBatch(timerRange string) {
 	ticker := time.NewTicker(d)
 	tick = ticker
 
-	doneChan = make(chan bool)
+	//doneChan = make(chan bool)
 
 	go func() {
 		publish(nil, nil)
@@ -95,7 +98,7 @@ func StartTriggeringBatch(timerRange string) {
 			fmt.Printf("Published at: %v\n", t)
 		}
 	}()
-	<- doneChan
+	//<- doneChan
 }
 
 func StopTicker(w http.ResponseWriter, r *http.Request) {
@@ -104,5 +107,28 @@ func StopTicker(w http.ResponseWriter, r *http.Request) {
 }
 
 func StopTriggering() {
-	tick.Stop()
+ 	tick.Stop()
+}
+
+func getLocalIP() string {
+
+	var ip string
+
+	addrs, err := net.InterfaceAddrs()
+
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	for _, address := range addrs {
+		// check the address type and if it is not a loopback the display it
+		if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+			if ipnet.IP.To4() != nil {
+				fmt.Println(ipnet.IP.String())
+				ip = ipnet.String()
+			}
+		}
+	}
+	return ip
 }

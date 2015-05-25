@@ -116,21 +116,21 @@ func GetBody(message string, media []byte, address string, createdAt string, pla
 	}
 	msg += " In " + address
 
-	if cat == "PRC" || cat == "DST" {
-		if city == "rome" || city == "roma" {
-			msg += " - @plromacapitale @fajelamulta @romamigliore"
-		}
-	}
-	if cat == "RTF" {
-		if city == "rome" || city == "roma" {
-			msg += " - #AMARoma"
-		}
-	}
-	if cat == "ABS" || cat == "ILL" || cat == "MNT" || cat == "VND" || cat == "SGN" || cat == "DST" || cat == "RFT" {
-		if city == "rome" || city == "roma" {
-			msg += " - @Retake_Roma @romafaschifo"
-		}
-	}
+//	if cat == "PRC" || cat == "DST" {
+//		if city == "rome" || city == "roma" {
+//			msg += " - @plromacapitale @fajelamulta @romamigliore"
+//		}
+//	}
+//	if cat == "RTF" {
+//		if city == "rome" || city == "roma" {
+//			msg += " - #AMARoma"
+//		}
+//	}
+//	if cat == "ABS" || cat == "ILL" || cat == "MNT" || cat == "VND" || cat == "SGN" || cat == "DST" || cat == "RFT" {
+//		if city == "rome" || city == "roma" {
+//			msg += " - @Retake_Roma @romafaschifo"
+//		}
+//	}
 
 
 	mp.WriteField("status", fmt.Sprintf(msg))
@@ -244,8 +244,8 @@ func main() {
 		http.HandleFunc("/startTicker", StartTriggering)
 		http.HandleFunc("/stopTicker", StopTicker)
 		http.HandleFunc("/", GetInfo)
-		http.ListenAndServe("localhost:8000", nil)
 		fmt.Println("Listening on port 8000")
+		http.ListenAndServe("localhost:8000", nil)
 	} else {
 		ErrorHandling(errors.New("Invalid argument, valid optins are 'batch' or 'server'"), "Error: ", 1)
 	}
