@@ -18,6 +18,7 @@ var (
 
 func GetInfo(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html")
+	port := os.Getenv("PORT")
 	toRender := "<!DOCTYPE html>" +
 			"<html>" +
 			"<head lang='en'>" +
@@ -26,14 +27,14 @@ func GetInfo(w http.ResponseWriter, r *http.Request) {
 			"</head>" +
 			"<script>" +
 			"function setInterval() {" +
-			"document.getElementById('startln').href = 'http://localhost:8000/startTicker?interval=' + document.getElementById('interval').value;" +
+			"document.getElementById('startln').href = ':" + port + "/startTicker?interval=' + document.getElementById('interval').value;" +
 			"}" +
 			"</script>" +
 			"<body>" +
 			"<div id='commands'>" +
 			"<ul>" +
-			"<li><a href='http://localhost:8000/startTicker?interval=10s' id='startln'>Start</a> <input type='text' id='interval' onkeyup='setInterval()' value='10s'></li>" +
-			"<li><a href='http://localhost:8000/stopTicker'>Stop</a></li>" +
+			"<li><a href=':" + port + "/startTicker?interval=10s' id='startln'>Start</a> <input type='text' id='interval' onkeyup='setInterval()' value='10s'></li>" +
+			"<li><a href=':" + port + "/stopTicker'>Stop</a></li>" +
 			"</ul>" +
 			"</div>" +
 			"</body>" +
