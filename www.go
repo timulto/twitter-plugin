@@ -32,7 +32,7 @@ func GetInfo(w http.ResponseWriter, r *http.Request) {
 			"<body>" +
 			"<div id='commands'>" +
 			"<ul>" +
-			"<li><a href='/startTicker?interval=10s' id='startln'>Start</a> <input type='text' id='interval' onkeyup='setInterval()' value='10s'></li>" +
+			"<li><a href='/startTicker?interval=10s' id='startln'>Start</a> <input type='text' id='interval' onkeyup='setInterval()' value='300s'></li>" +
 			"<li><a href='/stopTicker'>Stop</a></li>" +
 			"</ul>" +
 			"</div>" +
