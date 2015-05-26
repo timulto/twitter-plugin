@@ -244,8 +244,9 @@ func main() {
 		http.HandleFunc("/startTicker", StartTriggering)
 		http.HandleFunc("/stopTicker", StopTicker)
 		http.HandleFunc("/", GetInfo)
-		fmt.Println("Listening on port 8000")
-		http.ListenAndServe("localhost:8000", nil)
+		port := os.Getenv("PORT")
+		fmt.Println("Listening on port " + port)
+		http.ListenAndServe(":" + port, nil)
 	} else {
 		ErrorHandling(errors.New("Invalid argument, valid optins are 'batch' or 'server'"), "Error: ", 1)
 	}
