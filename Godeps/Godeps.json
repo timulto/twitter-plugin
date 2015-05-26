@@ -1,18 +1,5 @@
 {
-	"ImportPath": "github.com/twitter-plugin/tweety",
+	"ImportPath": "github.com/twitter-plugin",
 	"GoVersion": "go1.4.2",
-	"Deps": [
-		{
-			"ImportPath": "github.com/kurrik/json",
-			"Rev": "f63ef626c5ffbfcd5dd5430c18c8b2eb14593c38"
-		},
-		{
-			"ImportPath": "github.com/kurrik/oauth1a",
-			"Rev": "fc2542bc5f2532ed4a437960d2d51ff6e18a5cb6"
-		},
-		{
-			"ImportPath": "github.com/kurrik/twittergo",
-			"Rev": "f2d1a94cbfe46e3588e6c37195ee593b28ea21ab"
-		}
-	]
+	"Deps": []
 }
