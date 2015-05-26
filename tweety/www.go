@@ -88,7 +88,7 @@ func StartTriggeringBatch(timerRange string) {
 	ticker := time.NewTicker(d)
 	tick = ticker
 
-	//doneChan = make(chan bool)
+	doneChan = make(chan bool)
 
 	go func() {
 		publish(nil, nil)
@@ -98,7 +98,7 @@ func StartTriggeringBatch(timerRange string) {
 			fmt.Printf("Published at: %v\n", t)
 		}
 	}()
-	//<- doneChan
+	<- doneChan
 }
 
 func StopTicker(w http.ResponseWriter, r *http.Request) {
