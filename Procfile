@@ -1,1 +1,1 @@
-web: twitter-plugin server 60s
+web: tweety server 60s
