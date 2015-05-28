@@ -71,31 +71,15 @@ func StartTriggering(w http.ResponseWriter, r *http.Request) {
 			select {
 			case t:= <- ticker.C:
 				publish(nil, nil)
-				if w != nil {
-					io.WriteString(w, "Published at " + time.Now().Local().Format("2006-01-02 15:04:05 +0800") + "\n")
-				} else {
-					fmt.Printf("Published at: %v\n", t)
-				}
+				fmt.Printf("Published at: %v\n", t)
 			case <- doneChan:
 				ticker.Stop()
 				fmt.Println("Publishing paused")
 			}
 		}
-
-
-
-//		for t := range ticker.C {
-		//			publish(nil, nil)
-		//			if w != nil {
-		//				io.WriteString(w, "Published at " + time.Now().Local().Format("2006-01-02 15:04:05 +0800") + "\n")
-		//			} else {
-		//				fmt.Printf("Published at: %v\n", t)
-		//			}
-		//		}
-
 	}()
 
-	//<- doneChan
+	io.WriteString(w, "Started at " + time.Now().Local().Format("2006-01-02 15:04:05 +0800") + "\n")
 }
 
 func StartTriggeringBatch(timerRange string) {
