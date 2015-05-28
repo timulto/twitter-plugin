@@ -1,1 +1,1 @@
-web: tweety server 300s
+worker: tweety server 300s
