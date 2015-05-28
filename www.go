@@ -61,19 +61,38 @@ func StartTriggering(w http.ResponseWriter, r *http.Request) {
 	ticker := time.NewTicker(d)
 	tick = ticker
 
-	//doneChan = make(chan bool)
+	doneChan = make(chan bool)
 
 	go func() {
 		publish(nil, nil)
 		fmt.Println("waiting for next publishing....")
-		for t := range ticker.C {
-			publish(nil, nil)
-			if w != nil {
-				io.WriteString(w, "Published at " + time.Now().Local().Format("2006-01-02 15:04:05 +0800") + "\n")
-			} else {
-				fmt.Printf("Published at: %v\n", t)
+
+		for {
+			select {
+			case t:= <- ticker.C:
+				publish(nil, nil)
+				if w != nil {
+					io.WriteString(w, "Published at " + time.Now().Local().Format("2006-01-02 15:04:05 +0800") + "\n")
+				} else {
+					fmt.Printf("Published at: %v\n", t)
+				}
+			case <- doneChan:
+				ticker.Stop()
+				fmt.Printf("Publishing paused")
 			}
 		}
+
+
+
+//		for t := range ticker.C {
+		//			publish(nil, nil)
+		//			if w != nil {
+		//				io.WriteString(w, "Published at " + time.Now().Local().Format("2006-01-02 15:04:05 +0800") + "\n")
+		//			} else {
+		//				fmt.Printf("Published at: %v\n", t)
+		//			}
+		//		}
+
 	}()
 
 	//<- doneChan
@@ -107,7 +126,7 @@ func StopTicker(w http.ResponseWriter, r *http.Request) {
 }
 
 func StopTriggering() {
- 	tick.Stop()
+ 	doneChan <- true
 }
 
 func getLocalIP() string {
