@@ -78,7 +78,7 @@ func StartTriggering(w http.ResponseWriter, r *http.Request) {
 				}
 			case <- doneChan:
 				ticker.Stop()
-				fmt.Printf("Publishing paused")
+				fmt.Println("Publishing paused")
 			}
 		}
 

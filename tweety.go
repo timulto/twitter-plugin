@@ -20,6 +20,8 @@ import (
 //	"crypto/hmac"
 	"errors"
 	//"net"
+	"os/signal"
+	"syscall"
 )
 
 const CONSUMER_KEY = "CONSUMER_KEY"
@@ -219,6 +221,15 @@ func getPlaceId(latitude float64, longitude float64) (p string) {
 }
 
 func main() {
+
+	// SIGINT Managment
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	signal.Notify(c, syscall.SIGTERM)
+	go func() {
+		<-c
+		fmt.Println("SIGTERM Detected")
+	}()
 
 	if len(os.Args) < 2 {
 		ErrorHandling(errors.New("Invalid number of arguments"), "Error: ", 1)
