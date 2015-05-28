@@ -234,6 +234,7 @@ func main() {
 	if len(os.Args) < 2 {
 		ErrorHandling(errors.New("Invalid number of arguments"), "Error: ", 1)
 	}
+	
 
 	loadCategory()
 
