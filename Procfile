@@ -1,1 +1,1 @@
-worker: tweety server 300s
+worker: tweety batch 300s
