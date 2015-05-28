@@ -1,1 +1,1 @@
-web: twitter-plugin server 300s
+web: tweety server 300s
