@@ -113,7 +113,7 @@ func GetBody(message string, media []byte, address string, createdAt string, pla
     t1 := t.Format(time.RFC822)
 	t1 = t1[0:len(t1)-3]
 
-	msgStart = category[cat] + "-"
+	msgStart = category[cat]
 
 	msgEnd = " In " + address
 
