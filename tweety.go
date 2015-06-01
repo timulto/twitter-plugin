@@ -102,7 +102,8 @@ func GetBody(message string, media []byte, address string, createdAt string, pla
 		mp *multipart.Writer
 		//media  []byte
 		writer io.Writer
-		msg string
+		msgStart string
+		msgEnd string
 	)
 
 	body = bytes.NewBufferString("")
@@ -112,30 +113,37 @@ func GetBody(message string, media []byte, address string, createdAt string, pla
     t1 := t.Format(time.RFC822)
 	t1 = t1[0:len(t1)-3]
 
-	msg = fmt.Sprintf("%v", t1) + " - " + category[cat] + " -"
-	if message != "" {
-	    msg += " '" +  message + "'"
+	msgStart = category[cat] + "-"
+
+	msgEnd = " In " + address
+
+	if cat == "PRC" || cat == "DST" {
+		if city == "rome" || city == "roma" {
+			msgEnd += " @plromacapitale @fajelamulta @romamigliore"
+		}
 	}
-	msg += " In " + address
+	if cat == "RTF" {
+		if city == "rome" || city == "roma" {
+			msgEnd += " #AMARoma"
+		}
+	}
+	if cat == "ABS" || cat == "ILL" || cat == "MNT" || cat == "VND" || cat == "SGN" || cat == "DST" || cat == "RFT" {
+		if city == "rome" || city == "roma" {
+			msgEnd += " @Retake_Roma @romafaschifo"
+		}
+	}
 
-//	if cat == "PRC" || cat == "DST" {
-//		if city == "rome" || city == "roma" {
-//			msg += " - @plromacapitale @fajelamulta @romamigliore"
-//		}
-//	}
-//	if cat == "RTF" {
-//		if city == "rome" || city == "roma" {
-//			msg += " - #AMARoma"
-//		}
-//	}
-//	if cat == "ABS" || cat == "ILL" || cat == "MNT" || cat == "VND" || cat == "SGN" || cat == "DST" || cat == "RFT" {
-//		if city == "rome" || city == "roma" {
-//			msg += " - @Retake_Roma @romafaschifo"
-//		}
-//	}
+	if len(msgStart + message + msgEnd) > 140 {
+		availableLen := (140 - len(msgStart + msgEnd))
 
+		if availableLen < len(message) {
+			message = message[0:(availableLen - 4)] + "..."
+		}
+	}
 
-	mp.WriteField("status", fmt.Sprintf(msg))
+	fmt.Sprintf("Twet text: %v%v%v", msgStart, message, msgEnd)
+
+	mp.WriteField("status", fmt.Sprintf("%v%v%v", msgStart, message, msgEnd))
 //	mp.WriteField("place_id", placeId)
 
 	writer, err = mp.CreateFormField("media[]")
