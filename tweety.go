@@ -14,7 +14,6 @@ import (
 	"strings"
 	"time"
 	"encoding/json"
-    "encoding/base64"
 	"strconv"
 //	"crypto/md5"
 //	"crypto/hmac"
@@ -22,6 +21,7 @@ import (
 	//"net"
 	"os/signal"
 	"syscall"
+	"path/filepath"
 )
 
 const CONSUMER_KEY = "CONSUMER_KEY"
@@ -29,6 +29,7 @@ const CONSUMER_SECRET = "CONSUMER_SECRET"
 const ACCESS_TOKEN = "ACCESS_TOKEN"
 const ACCESS_TOKEN_SECRET = "ACCESS_TOKEN_SECRET"
 const HMAC_KEY = "HMAC_KEY"
+const FB_ACCESS_TOKEN = "FB_ACCESS_TOKEN"
 
 
 const APP_NAME = "twitter"
@@ -117,24 +118,31 @@ func GetBody(message string, media []byte, address string, createdAt string, pla
 
 	msgEnd = " In " + address
 
+	msgHash := " "
+
 	if cat == "PRC" || cat == "DST" {
 		if city == "rome" || city == "roma" {
-			msgEnd += " @plromacapitale @fajelamulta @romamigliore"
+			msgHash += " @plromacapitale @fajelamulta @romamigliore"
 		}
 	}
 	if cat == "RTF" {
 		if city == "rome" || city == "roma" {
-			msgEnd += " #AMARoma"
+			msgHash += " #AMARoma"
 		}
 	}
 	if cat == "ABS" || cat == "ILL" || cat == "MNT" || cat == "VND" || cat == "SGN" || cat == "DST" || cat == "RFT" {
 		if city == "rome" || city == "roma" {
-			msgEnd += " @Retake_Roma @romafaschifo"
+			msgHash += " @Retake_Roma @romafaschifo"
 		}
 	}
 
-	if len(msgStart + message + msgEnd) > 140 {
-		availableLen := (140 - len(msgStart + msgEnd))
+	if len(message) > 0 {
+		message = " " + message
+		msgStart = ""
+	}
+
+	if len(msgStart + message + msgEnd + msgHash) > 139 {
+		availableLen := (139 - len(msgStart + msgEnd))
 
 		if availableLen < len(message) {
 			message = message[0:(availableLen - 4)] + "..."
@@ -172,15 +180,6 @@ type Fine struct {
     Text string
 }
 
-func decode(str string) (data []byte){
-
-	data, err := base64.StdEncoding.DecodeString(str)
-	if err != nil {
-		fmt.Println("error:", err)
-		return
-	}
-	return
-}
 
 type PlaceResult struct {
 	Places []Location `json:"places"`
@@ -278,24 +277,26 @@ func publish(w http.ResponseWriter, r *http.Request) {
 		req    *http.Request
 		resp   *twittergo.APIResponse
 		tweet  *twittergo.Tweet
+		//mp *multipart.Writer
 	);
+
 
 	if client == nil {
 		client, _ = LoadCredentials();
 	}
 
-    var toTwet = GetFines()
-    var image []byte
+	var toTwet = GetFines()
+	var image []byte
 	baseendpoint := "/1.1/statuses/update_with_media.json"
 
 	if len(toTwet) == 0 {
-	    fmt.Println("No mew tweet to post")
+		fmt.Println("No mew tweet to post")
 		if w != nil {
 			io.WriteString(w, "No mew tweet to post\n")
 		}
 	}
 
-    for _, element := range toTwet {
+	for _, element := range toTwet {
 
 		placeId := getPlaceId(element.Loc.Coordinates[1], element.Loc.Coordinates[0])
 
@@ -304,17 +305,17 @@ func publish(w http.ResponseWriter, r *http.Request) {
 
 		endpoint := baseendpoint + "?lat=" + latitude + "&long=" + longitude + "&display_coordinates=true"
 
-        image = decode(element.ImageData[22:])
-        body, header, err := GetBody(element.Text, image, element.Address, element.CreatedAt, placeId, strings.ToLower(element.City), element.Category)
+		image = Decode(element.ImageData[22:])
+		body, header, err := GetBody(element.Text, image, element.Address, element.CreatedAt, placeId, strings.ToLower(element.City), element.Category)
 
 		ErrorHandling(err, "Problem loading body: ", 1)
 
-        req, err = http.NewRequest("POST", endpoint, body)
+		req, err = http.NewRequest("POST", endpoint, body)
 		ErrorHandling(err, "Could not parse request: ", 1)
 
-        req.Header.Set("Content-Type", header)
+		req.Header.Set("Content-Type", header)
 
-        resp, err = client.SendRequest(req)
+		resp, err = client.SendRequest(req)
 		ErrorHandling(err, "Could not send request: ", 1)
 
 		tweet = &twittergo.Tweet{}
@@ -360,9 +361,56 @@ func publish(w http.ResponseWriter, r *http.Request) {
 			fmt.Println("Error: " + fmt.Sprintf("%s", r))
 			ErrorHandling(errors.New("Error while trying to mark tweet as red"), "Error: ", 1)
 		}
-//		fmt.Println("Response Body: \n" + fmt.Sprintf("%s", r))
+		//		fmt.Println("Response Body: \n" + fmt.Sprintf("%s", r))
 
 		fmt.Println("Tweet " + tId + " marked as published.")
+
+		// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+		//Post fine on facebook
+		fbUrl := "https://graph.facebook.com/v2.3"
+		fbResource := "/timulto/photos"
+		// creating temp file
+		err = ioutil.WriteFile("tempfile", image, 0777)
+		ErrorHandling(err, "Problem while writing temp file", 1)
+
+		file, err := os.Open("tempfile")
+		ErrorHandling(err, "Problem while readind temp file", 1)
+
+		defer file.Close();
+		//defer os.Remove("tempfile")
+
+		body = &bytes.Buffer{}
+		writer := multipart.NewWriter(body)
+		part, err := writer.CreateFormFile("source", filepath.Base("tempfile"))
+		ErrorHandling(err, "Error while creating part file", 1)
+
+		_, err = io.Copy(part, file)
+		ErrorHandling(err, "Error while copying file in to the part", 1)
+
+		_ = writer.WriteField("access_token", os.Getenv(FB_ACCESS_TOKEN))
+		_ = writer.WriteField("caption", category[element.Category] + " - " + element.Text + " - " + element.Address)
+
+		err = writer.Close()
+		ErrorHandling(err, "Error while closing writer", 1)
+
+		reqFB, errFB := http.NewRequest("POST", (fbUrl + fbResource), body)
+		reqFB.Header.Set("Content-Type", writer.FormDataContentType())
+
+		client = &http.Client{}
+		respFB, errFB := client.Do(reqFB)
+
+		ErrorHandling(errFB, "Problem while posting fine on facebook", 1)
+
+		rFB, err3 := ioutil.ReadAll(respFB.Body)
+		ErrorHandling(err3, "Problem while reading response: ", 1)
+
+		respCode = respFB.StatusCode
+		fmt.Printf("Resp Code: %v\n", respCode)
+		if respCode != 200 {
+			fmt.Println("Error: " + fmt.Sprintf("%s", rFB))
+			//ErrorHandling(errors.New("Error while posting fine on facebook"), "Error: ", 1)
+		}
+		// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 		fmt.Println("------------------------------------------------------------------------------------")
 		fmt.Printf("Endpoint ...........%v\n", endpoint)
