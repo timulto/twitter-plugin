@@ -98,7 +98,7 @@ func LoadCredentials() (client *twittergo.Client, err error) {
 	return
 }
 
-func GetBody(message string, media []byte, address string, createdAt string, placeId string, city string, cat string) (body io.ReadWriter, header string, err error) {
+func GetBody(message string, media []byte, address string, createdAt string, placeId string, city string, cat string, county string) (body io.ReadWriter, header string, err error) {
 	var (
 		mp *multipart.Writer
 		//media  []byte
@@ -135,7 +135,7 @@ func GetBody(message string, media []byte, address string, createdAt string, pla
 			msgHash += " @Retake_Roma @romafaschifo"
 		}
 	}
-	if city == "benevento" {
+	if county == "bn" {
 		msgHash += " @sannioreport"
 	}
 
@@ -175,6 +175,7 @@ type Fine struct {
     Id string `json:"_id"`
     Address string
 	City string
+	County string `json:"county"`
     Approved bool
     Category string
     CreatedAt string
@@ -309,7 +310,7 @@ func publish(w http.ResponseWriter, r *http.Request) {
 		endpoint := baseendpoint + "?lat=" + latitude + "&long=" + longitude + "&display_coordinates=true"
 
 		image = Decode(element.ImageData[22:])
-		body, header, err := GetBody(element.Text, image, element.Address, element.CreatedAt, placeId, strings.ToLower(element.City), element.Category)
+		body, header, err := GetBody(element.Text, image, element.Address, element.CreatedAt, placeId, strings.ToLower(element.City), element.Category, strings.ToLower(element.County))
 
 		ErrorHandling(err, "Problem loading body: ", 1)
 
