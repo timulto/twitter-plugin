@@ -118,7 +118,7 @@ func GetBody(message string, media []byte, address string, createdAt string, pla
 
 	msgEnd = " In " + address
 
-	msgHash := " "
+	msgHash := ""
 
 	if cat == "PRC" || cat == "DST" {
 		if city == "rome" || city == "roma" {
@@ -151,7 +151,7 @@ func GetBody(message string, media []byte, address string, createdAt string, pla
 
 	fmt.Sprintf("Twet text: %v%v%v", msgStart, message, msgEnd)
 
-	mp.WriteField("status", fmt.Sprintf("%v%v%v", msgStart, message, msgEnd))
+	mp.WriteField("status", fmt.Sprintf("%v%v%v%v", msgStart, message, msgEnd, msgHash))
 //	mp.WriteField("place_id", placeId)
 
 	writer, err = mp.CreateFormField("media[]")
