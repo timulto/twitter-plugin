@@ -135,6 +135,9 @@ func GetBody(message string, media []byte, address string, createdAt string, pla
 			msgHash += " @Retake_Roma @romafaschifo"
 		}
 	}
+	if city == "benevento" {
+		msgHash += " @sannioreport"
+	}
 
 	if len(message) > 0 {
 		message = " " + message
