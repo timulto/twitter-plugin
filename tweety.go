@@ -120,14 +120,15 @@ func GetBody(message string, media []byte, address string, createdAt string, pla
 
 	msgHash := ""
 
+	// category + rome
 	if cat == "PRC" || cat == "DST" {
 		if city == "rome" || city == "roma" {
-			msgHash += " @plromacapitale @fajelamulta @romamigliore"
+			msgHash += " @plromacapitale @fajelamulta @romamigliore @incivileabordo"
 		}
 	}
 	if cat == "RTF" {
 		if city == "rome" || city == "roma" {
-			msgHash += " #AMARoma"
+			msgHash += " #AMARoma @RomaPulita"
 		}
 	}
 	if cat == "ABS" || cat == "ILL" || cat == "MNT" || cat == "VND" || cat == "SGN" || cat == "DST" || cat == "RFT" {
@@ -135,9 +136,24 @@ func GetBody(message string, media []byte, address string, createdAt string, pla
 			msgHash += " @Retake_Roma @romafaschifo"
 		}
 	}
+
+	// category + milan
+	if cat == "RTF" {
+		if city == "milano" || city == "milan" {
+			msgHash += " @milanopulita"
+		}
+	}
+
+	// rome
+	if city == "rome" || city == "roma" {
+		msgHash += " @Antincivili"
+	}
+
+	// benevento
 	if county == "bn" {
 		msgHash += " @sannioreport"
 	}
+
 
 	if len(message) > 0 {
 		message = " " + message
@@ -245,7 +261,6 @@ func main() {
 	if len(os.Args) < 2 {
 		ErrorHandling(errors.New("Invalid number of arguments"), "Error: ", 1)
 	}
-	
 
 	loadCategory()
 
