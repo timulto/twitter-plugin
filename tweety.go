@@ -46,7 +46,7 @@ var (
 func loadCategory() {
 
 	category = map[string]string {
-		"PRC": "Parcheggio incivile",
+		"PRC": "Sosta in divieto",
 		"RFT": "Rifiuti o cassonetti sporchi",
 		"ACC": "Accessibilità scarsa o mancante",
 		"ABS": "Abusivismo",
