@@ -184,7 +184,7 @@ func GetBody(message string, media []byte, address string, createdAt string, pla
 	tText := fmt.Sprintf("%v%v%v%v", msgStart, message, msgEnd, msgHash)
 	if len(tText) > 110 {
 		fmt.Println("[GetBody] still to long message, truncating to 140")
-		tText = tText[(len(tText) - 110):]
+		tText = tText[0:110]
 	}
 
 	fmt.Println("Text: " + tText)
