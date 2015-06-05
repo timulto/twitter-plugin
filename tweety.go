@@ -160,17 +160,37 @@ func GetBody(message string, media []byte, address string, createdAt string, pla
 		msgStart = ""
 	}
 
-	if len(msgStart + message + msgEnd + msgHash) > 139 {
-		availableLen := (139 - len(msgStart + msgEnd))
+	if len(msgStart + message + msgEnd + msgHash) > 110 {
+		fmt.Println("[GetBody] message is over limit")
+		availableLen := (110 - len(msgStart + msgEnd + msgHash))
 
-		if availableLen < len(message) {
-			message = message[0:(availableLen - 4)] + "..."
+		if availableLen > 0 {
+			if availableLen < len(message) {
+				fmt.Println("[GetBody] truncating message")
+				if availableLen > 3 {
+					message = message[0:(availableLen - 3)] + "..."
+				} else {
+					message = message[0:(availableLen)]
+				}
+			} else {
+				fmt.Println("[GetBody] blanking message")
+				message = ""
+			}
+		} else {
+			fmt.Println("[GetBody] It's not possible to gracefully truncate message")
 		}
 	}
 
-	fmt.Sprintf("Twet text: %v%v%v", msgStart, message, msgEnd)
+	tText := fmt.Sprintf("%v%v%v%v", msgStart, message, msgEnd, msgHash)
+	if len(tText) > 110 {
+		fmt.Println("[GetBody] still to long message, truncating to 140")
+		tText = tText[(len(tText) - 110):]
+	}
 
-	mp.WriteField("status", fmt.Sprintf("%v%v%v%v", msgStart, message, msgEnd, msgHash))
+	fmt.Println("Text: " + tText)
+
+	mp.WriteField("status", tText)
+
 //	mp.WriteField("place_id", placeId)
 
 	writer, err = mp.CreateFormField("media[]")
@@ -330,16 +350,16 @@ func publish(w http.ResponseWriter, r *http.Request) {
 		ErrorHandling(err, "Problem loading body: ", 1)
 
 		req, err = http.NewRequest("POST", endpoint, body)
-		ErrorHandling(err, "Could not parse request: ", 1)
+		ErrorHandling(err, "[Tweet Post] Could not parse request: ", 1)
 
 		req.Header.Set("Content-Type", header)
 
 		resp, err = client.SendRequest(req)
-		ErrorHandling(err, "Could not send request: ", 1)
+		ErrorHandling(err, "[Tweet Post] Could not send request: ", 1)
 
 		tweet = &twittergo.Tweet{}
 		err = resp.Parse(tweet)
-		ErrorHandling(err, "Problem parsing response: ", 1)
+		ErrorHandling(err, "[Tweet Post] Problem parsing response: ", 1)
 
 		// Mark fine posted on twitter
 		url1 := "http://beta.timulto.org"
