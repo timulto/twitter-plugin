@@ -79,7 +79,9 @@ func StartTriggering(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	io.WriteString(w, "Started at " + time.Now().Local().Format("2006-01-02 15:04:05 +0800") + "\n")
+	if w != nil {
+		io.WriteString(w, "Started at "+time.Now().Local().Format("2006-01-02 15:04:05 +0800")+"\n")
+	}
 }
 
 func StartTriggeringBatch(timerRange string) {

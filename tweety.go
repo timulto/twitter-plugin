@@ -9,16 +9,12 @@ import (
 	"io/ioutil"
 	"mime/multipart"
 	"net/http"
-	"net/url"
 	"os"
 	"strings"
 	"time"
 	"encoding/json"
 	"strconv"
-//	"crypto/md5"
-//	"crypto/hmac"
 	"errors"
-	//"net"
 	"os/signal"
 	"syscall"
 	"path/filepath"
@@ -30,8 +26,6 @@ const ACCESS_TOKEN = "ACCESS_TOKEN"
 const ACCESS_TOKEN_SECRET = "ACCESS_TOKEN_SECRET"
 const HMAC_KEY = "HMAC_KEY"
 const FB_ACCESS_TOKEN = "FB_ACCESS_TOKEN"
-
-
 const APP_NAME = "twitter"
 
 var (
@@ -39,9 +33,53 @@ var (
 	auth string = "false"
 	hmacKey string
 	timerRange string
-	//doneChan chan(bool)
 	category map[string]string
 )
+
+func main() {
+
+	// SIGINT Managment
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	signal.Notify(c, syscall.SIGTERM)
+	go func() {
+		<-c
+		fmt.Println("SIGTERM Detected")
+	}()
+
+	if len(os.Args) < 2 {
+		ErrorHandling(errors.New("Invalid number of arguments"), "Error: ", 1)
+	}
+
+	loadCategory()
+
+	if len(os.Args) == 3 {
+		timerRange = os.Args[2]
+	} else {
+		timerRange = "300s"
+	}
+
+	if os.Args[1] == "batch" {
+		fmt.Println("Running in batch mode")
+		if timerRange == "" {
+			publish(nil, nil)
+		} else {
+			StartTriggeringBatch(timerRange)
+		}
+	} else if os.Args[1] == "server" {
+		fmt.Println("Running in server mode")
+		http.HandleFunc("/publish", publish)
+		http.HandleFunc("/startTicker", StartTriggering)
+		http.HandleFunc("/stopTicker", StopTicker)
+		http.HandleFunc("/", GetInfo)
+		port := os.Getenv("PORT")
+		fmt.Println("Listening on port " + port)
+		StartTriggering(nil, nil)
+		http.ListenAndServe(":" + port, nil)
+	} else {
+		ErrorHandling(errors.New("Invalid argument, valid optins are 'batch' or 'server'"), "Error: ", 1)
+	}
+}
 
 func loadCategory() {
 
@@ -267,48 +305,6 @@ func getPlaceId(latitude float64, longitude float64) (p string) {
 
 }
 
-func main() {
-
-	// SIGINT Managment
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
-	signal.Notify(c, syscall.SIGTERM)
-	go func() {
-		<-c
-		fmt.Println("SIGTERM Detected")
-	}()
-
-	if len(os.Args) < 2 {
-		ErrorHandling(errors.New("Invalid number of arguments"), "Error: ", 1)
-	}
-
-	loadCategory()
-
-	if len(os.Args) == 3 {
-		timerRange = os.Args[2]
-	}
-
-	if os.Args[1] == "batch" {
-		fmt.Println("Running in batch mode")
-		if timerRange == "" {
-			publish(nil, nil)
-		} else {
-			StartTriggeringBatch(timerRange)
-		}
-
-	} else if os.Args[1] == "server" {
-		fmt.Println("Running in server mode")
-		http.HandleFunc("/publish", publish)
-		http.HandleFunc("/startTicker", StartTriggering)
-		http.HandleFunc("/stopTicker", StopTicker)
-		http.HandleFunc("/", GetInfo)
-		port := os.Getenv("PORT")
-		fmt.Println("Listening on port " + port)
-		http.ListenAndServe(":" + port, nil)
-	} else {
-		ErrorHandling(errors.New("Invalid argument, valid optins are 'batch' or 'server'"), "Error: ", 1)
-	}
-}
 
 func publish(w http.ResponseWriter, r *http.Request) {
 
@@ -350,104 +346,69 @@ func publish(w http.ResponseWriter, r *http.Request) {
 		ErrorHandling(err, "Problem loading body: ", 1)
 
 		req, err = http.NewRequest("POST", endpoint, body)
-		ErrorHandling(err, "[Tweet Post] Could not parse request: ", 1)
+		if !ErrorHandling(err, "[Tweet Post] Could not parse request: ", 0) {
 
-		req.Header.Set("Content-Type", header)
+			req.Header.Set("Content-Type", header)
 
-		resp, err = client.SendRequest(req)
-		ErrorHandling(err, "[Tweet Post] Could not send request: ", 1)
+			resp, err = client.SendRequest(req)
+			ErrorHandling(err, "[Tweet Post] Could not send request: ", 0)
 
-		tweet = &twittergo.Tweet{}
-		err = resp.Parse(tweet)
-		ErrorHandling(err, "[Tweet Post] Problem parsing response: ", 1)
-
-		// Mark fine posted on twitter
-		url1 := "http://beta.timulto.org"
-		resource := "/api/fine/" + element.Id +  "/twitter"
-
-		tId := strconv.FormatUint(tweet.Id(), 10)
-
-		parameters := url.Values{}
-		parameters.Add("postId", tId)
-
-		u, _ := url.ParseRequestURI(url1)
-		u.Path = resource
-		urlStr := fmt.Sprintf("%v", u)
-
-		t := time.Now().Local()
-		tstamp := t.Format("20060102150405")
-		toEncode := tstamp + "#" + APP_NAME + "#" + "twitter" + "#" + element.Id
-		token := EncHmacMD5(toEncode, hmacKey)
-
-		req, _ := http.NewRequest("POST", urlStr, bytes.NewBufferString(parameters.Encode()))
-		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-		req.Header.Add("Content-Length", strconv.Itoa(len(parameters.Encode())))
-		req.Header.Add("timestamp", tstamp)
-		req.Header.Add("app", APP_NAME)
-		req.Header.Add("token", token)
-
-		client := &http.Client{}
-		resp1, err1 := client.Do(req)
-
-		ErrorHandling(err1, "Problem while marking tweet " + tId + " published", 1)
-
-		r, err2 := ioutil.ReadAll(resp1.Body)
-		ErrorHandling(err2, "Problem while reading response: ", 1)
-
-		respCode := resp1.StatusCode
-		fmt.Printf("Resp Code: %v\n", respCode)
-		if respCode != 200 {
-			fmt.Println("Error: " + fmt.Sprintf("%s", r))
-			ErrorHandling(errors.New("Error while trying to mark tweet as red"), "Error: ", 1)
+			tweet = &twittergo.Tweet{}
+			err = resp.Parse(tweet)
+			if !ErrorHandling(err, "[Tweet Post] Problem parsing response: ", 0) {
+				// Mark fine posted on twitter
+				MarkAsTwitted(tweet, element)
+			}
 		}
-		//		fmt.Println("Response Body: \n" + fmt.Sprintf("%s", r))
 
-		fmt.Println("Tweet " + tId + " marked as published.")
 
-		// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+		// >>>>>>To Refactor >>>>>>>>>>>>>>>>>>>>>>>>>>
 		//Post fine on facebook
-		fbUrl := "https://graph.facebook.com/v2.3"
-		fbResource := "/timulto/photos"
-		// creating temp file
-		err = ioutil.WriteFile("tempfile", image, 0777)
-		ErrorHandling(err, "Problem while writing temp file", 1)
+		if err != nil {
+			fbUrl := "https://graph.facebook.com/v2.3"
+			fbResource := "/timulto/photos"
+			// creating temp file
+			err = ioutil.WriteFile("tempfile", image, 0777)
+			ErrorHandling(err, "Problem while writing temp file", 1)
 
-		file, err := os.Open("tempfile")
-		ErrorHandling(err, "Problem while readind temp file", 1)
+			file, err := os.Open("tempfile")
+			ErrorHandling(err, "Problem while readind temp file", 1)
 
-		defer file.Close();
-		//defer os.Remove("tempfile")
+			defer file.Close();
+			//defer os.Remove("tempfile")
 
-		body = &bytes.Buffer{}
-		writer := multipart.NewWriter(body)
-		part, err := writer.CreateFormFile("source", filepath.Base("tempfile"))
-		ErrorHandling(err, "Error while creating part file", 1)
+			body = &bytes.Buffer{}
+			writer := multipart.NewWriter(body)
+			part, err := writer.CreateFormFile("source", filepath.Base("tempfile"))
+			ErrorHandling(err, "Error while creating part file", 1)
 
-		_, err = io.Copy(part, file)
-		ErrorHandling(err, "Error while copying file in to the part", 1)
+			_, err = io.Copy(part, file)
+			ErrorHandling(err, "Error while copying file in to the part", 1)
 
-		_ = writer.WriteField("access_token", os.Getenv(FB_ACCESS_TOKEN))
-		_ = writer.WriteField("caption", category[element.Category] + " - " + element.Text + " - " + element.Address)
+			_ = writer.WriteField("access_token", os.Getenv(FB_ACCESS_TOKEN))
+			_ = writer.WriteField("caption", category[element.Category]+" - "+element.Text+" - "+element.Address)
 
-		err = writer.Close()
-		ErrorHandling(err, "Error while closing writer", 1)
+			err = writer.Close()
+			ErrorHandling(err, "Error while closing writer", 1)
 
-		reqFB, errFB := http.NewRequest("POST", (fbUrl + fbResource), body)
-		reqFB.Header.Set("Content-Type", writer.FormDataContentType())
+			reqFB, errFB := http.NewRequest("POST", (fbUrl+fbResource), body)
+			reqFB.Header.Set("Content-Type", writer.FormDataContentType())
 
-		client = &http.Client{}
-		respFB, errFB := client.Do(reqFB)
+			clientFB := &http.Client{}
+			respFB, errFB := clientFB.Do(reqFB)
 
-		ErrorHandling(errFB, "Problem while posting fine on facebook", 1)
+			ErrorHandling(errFB, "Problem while posting fine on facebook", 1)
 
-		rFB, err3 := ioutil.ReadAll(respFB.Body)
-		ErrorHandling(err3, "Problem while reading response: ", 1)
+			rFB, err3 := ioutil.ReadAll(respFB.Body)
+			ErrorHandling(err3, "Problem while reading response: ", 1)
 
-		respCode = respFB.StatusCode
-		fmt.Printf("Resp Code: %v\n", respCode)
-		if respCode != 200 {
-			fmt.Println("Error: " + fmt.Sprintf("%s", rFB))
-			//ErrorHandling(errors.New("Error while posting fine on facebook"), "Error: ", 1)
+			respCode := respFB.StatusCode
+			fmt.Printf("Resp Code: %v\n", respCode)
+			if respCode != 200 {
+				fmt.Println("Error: " + fmt.Sprintf("%s", rFB))
+				//ErrorHandling(errors.New("Error while posting fine on facebook"), "Error: ", 1)
+			}
 		}
 		// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
