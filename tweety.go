@@ -158,33 +158,31 @@ func GetBody(message string, media []byte, address string, createdAt string, pla
 
 	msgHash := ""
 
-	// category + rome
-	if cat == "PRC" || cat == "DST" {
-		if city == "rome" || city == "roma" {
-			msgHash += " @plromacapitale @fajelamulta @romamigliore @incivileabordo"
-		}
-	}
-	if cat == "RTF" {
-		if city == "rome" || city == "roma" {
-			msgHash += " #AMARoma @RomaPulita"
-		}
-	}
-	if cat == "ABS" || cat == "ILL" || cat == "MNT" || cat == "VND" || cat == "SGN" || cat == "DST" || cat == "RFT" {
-		if city == "rome" || city == "roma" {
-			msgHash += " @Retake_Roma @romafaschifo"
-		}
-	}
+//	// category + rome
+//	if cat == "PRC" || cat == "DST" {
+//		if city == "rome" || city == "roma" {
+//			msgHash += " @plromacapitale @fajelamulta @romamigliore @incivileabordo"
+//		}
+//	}
+//	if cat == "RTF" {
+//		if city == "rome" || city == "roma" {
+//			msgHash += " #AMARoma @RomaPulita"
+//		}
+//	}
+//	if cat == "ABS" || cat == "ILL" || cat == "MNT" || cat == "VND" || cat == "SGN" || cat == "DST" || cat == "RFT" {
+//		if city == "rome" || city == "roma" {
+//			msgHash += " @Retake_Roma @romafaschifo"
+//		}
+//	}
+//	if city == "rome" || city == "roma" {
+//		msgHash += " @Antincivili"
+//	}
 
 	// category + milan
 	if cat == "RTF" {
 		if city == "milano" || city == "milan" {
 			msgHash += " @milanopulita"
 		}
-	}
-
-	// rome
-	if city == "rome" || city == "roma" {
-		msgHash += " @Antincivili"
 	}
 
 	// benevento
@@ -198,9 +196,9 @@ func GetBody(message string, media []byte, address string, createdAt string, pla
 		msgStart = ""
 	}
 
-	if len(msgStart + message + msgEnd + msgHash) > 110 {
+	if len(msgStart + message + msgEnd + msgHash) > 120 {
 		fmt.Println("[GetBody] message is over limit")
-		availableLen := (110 - len(msgStart + msgEnd + msgHash))
+		availableLen := (120 - len(msgStart + msgEnd + msgHash))
 
 		if availableLen > 0 {
 			if availableLen < len(message) {
@@ -220,9 +218,9 @@ func GetBody(message string, media []byte, address string, createdAt string, pla
 	}
 
 	tText := fmt.Sprintf("%v%v%v%v", msgStart, message, msgEnd, msgHash)
-	if len(tText) > 110 {
+	if len(tText) > 120 {
 		fmt.Println("[GetBody] still to long message, truncating to 140")
-		tText = tText[0:110]
+		tText = tText[0:120]
 	}
 
 	fmt.Println("Text: " + tText)
