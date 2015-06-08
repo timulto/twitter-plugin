@@ -18,6 +18,7 @@ import (
 	"os/signal"
 	"syscall"
 	"path/filepath"
+	"net/url"
 )
 
 const CONSUMER_KEY = "CONSUMER_KEY"
@@ -26,6 +27,7 @@ const ACCESS_TOKEN = "ACCESS_TOKEN"
 const ACCESS_TOKEN_SECRET = "ACCESS_TOKEN_SECRET"
 const HMAC_KEY = "HMAC_KEY"
 const FB_ACCESS_TOKEN = "FB_ACCESS_TOKEN"
+const FB_PAGE_ID = "FB_PAGE_ID"
 const APP_NAME = "twitter"
 
 var (
@@ -75,7 +77,7 @@ func main() {
 		port := os.Getenv("PORT")
 		fmt.Println("Listening on port " + port)
 		StartTriggering(nil, nil)
-		http.ListenAndServe(":" + port, nil)
+		http.ListenAndServe(":"+port, nil)
 	} else {
 		ErrorHandling(errors.New("Invalid argument, valid optins are 'batch' or 'server'"), "Error: ", 1)
 	}
@@ -149,34 +151,34 @@ func GetBody(message string, media []byte, address string, createdAt string, pla
 	mp = multipart.NewWriter(body)
 
 	t, _ := time.Parse(time.RFC3339, createdAt)
-    t1 := t.Format(time.RFC822)
+	t1 := t.Format(time.RFC822)
 	t1 = t1[0:len(t1)-3]
 
 	msgStart = category[cat]
 
-	msgEnd = " In " + address
+	msgEnd = " In "+address
 
 	msgHash := ""
 
-//	// category + rome
-//	if cat == "PRC" || cat == "DST" {
-//		if city == "rome" || city == "roma" {
-//			msgHash += " @plromacapitale @fajelamulta @romamigliore @incivileabordo"
-//		}
-//	}
-//	if cat == "RTF" {
-//		if city == "rome" || city == "roma" {
-//			msgHash += " #AMARoma @RomaPulita"
-//		}
-//	}
-//	if cat == "ABS" || cat == "ILL" || cat == "MNT" || cat == "VND" || cat == "SGN" || cat == "DST" || cat == "RFT" {
-//		if city == "rome" || city == "roma" {
-//			msgHash += " @Retake_Roma @romafaschifo"
-//		}
-//	}
-//	if city == "rome" || city == "roma" {
-//		msgHash += " @Antincivili"
-//	}
+	//	// category + rome
+	//	if cat == "PRC" || cat == "DST" {
+	//		if city == "rome" || city == "roma" {
+	//			msgHash += " @plromacapitale @fajelamulta @romamigliore @incivileabordo"
+	//		}
+	//	}
+	//	if cat == "RTF" {
+	//		if city == "rome" || city == "roma" {
+	//			msgHash += " #AMARoma @RomaPulita"
+	//		}
+	//	}
+	//	if cat == "ABS" || cat == "ILL" || cat == "MNT" || cat == "VND" || cat == "SGN" || cat == "DST" || cat == "RFT" {
+	//		if city == "rome" || city == "roma" {
+	//			msgHash += " @Retake_Roma @romafaschifo"
+	//		}
+	//	}
+	//	if city == "rome" || city == "roma" {
+	//		msgHash += " @Antincivili"
+	//	}
 
 	// category + milan
 	if cat == "RTF" {
@@ -192,7 +194,7 @@ func GetBody(message string, media []byte, address string, createdAt string, pla
 
 
 	if len(message) > 0 {
-		message = " " + message
+		message = " "+message
 		msgStart = ""
 	}
 
@@ -204,7 +206,7 @@ func GetBody(message string, media []byte, address string, createdAt string, pla
 			if availableLen < len(message) {
 				fmt.Println("[GetBody] truncating message")
 				if availableLen > 3 {
-					message = message[0:(availableLen - 3)] + "..."
+					message = message[0:(availableLen-3)]+"..."
 				} else {
 					message = message[0:(availableLen)]
 				}
@@ -227,7 +229,7 @@ func GetBody(message string, media []byte, address string, createdAt string, pla
 
 	mp.WriteField("status", tText)
 
-//	mp.WriteField("place_id", placeId)
+	//	mp.WriteField("place_id", placeId)
 
 	writer, err = mp.CreateFormField("media[]")
 	ErrorHandling(err, "Error while creating writer: ", 1)
@@ -239,21 +241,21 @@ func GetBody(message string, media []byte, address string, createdAt string, pla
 }
 
 type location struct {
-      Type string
-      Coordinates []float64
+	Type        string
+	Coordinates []float64
 }
 
 type Fine struct {
-    Id string `json:"_id"`
-    Address string
-	City string
-	County string `json:"county"`
-    Approved bool
-    Category string
-    CreatedAt string
-    ImageData string
-    Loc location
-    Text string
+	Id        string `json:"_id"`
+	Address   string
+	City      string
+	County    string `json:"county"`
+	Approved  bool
+	Category  string
+	CreatedAt string
+	ImageData string
+	Loc       location
+	Text      string
 }
 
 
@@ -296,7 +298,7 @@ func getPlaceId(latitude float64, longitude float64) (p string) {
 	err4 := json.Unmarshal(jsonDataFromHttp, &data)
 	ErrorHandling(err4, "Error while parsing json response: ", 1)
 
-	if len(data.Result.Places) >0 {
+	if len(data.Result.Places) > 0 {
 		return data.Result.Places[0].Id
 	}
 	return ""
@@ -306,7 +308,7 @@ func getPlaceId(latitude float64, longitude float64) (p string) {
 
 func publish(w http.ResponseWriter, r *http.Request) {
 
-    var (
+	var (
 		req    *http.Request
 		resp   *twittergo.APIResponse
 		tweet  *twittergo.Tweet
@@ -363,51 +365,115 @@ func publish(w http.ResponseWriter, r *http.Request) {
 
 		// >>>>>>To Refactor >>>>>>>>>>>>>>>>>>>>>>>>>>
 		//Post fine on facebook
-		if err != nil {
-			fbUrl := "https://graph.facebook.com/v2.3"
-			fbResource := "/timulto/photos"
-			// creating temp file
-			err = ioutil.WriteFile("tempfile", image, 0777)
-			ErrorHandling(err, "Problem while writing temp file", 1)
+		//		if err == nil {
 
-			file, err := os.Open("tempfile")
-			ErrorHandling(err, "Problem while readind temp file", 1)
+		fbUrl := "https://graph.facebook.com"
+		fbResourceUpload := "/" + os.Getenv(FB_PAGE_ID) + "/photos"
+		var photo Photo
+		var photoDetails PhotoDetails
+		var feed Feed
+		var photoId string
+		var photoLink string
 
-			defer file.Close();
-			//defer os.Remove("tempfile")
+		// creating temp file
+		err = ioutil.WriteFile("tempfile", image, 0777)
+		ErrorHandling(err, "Problem while writing temp file", 0)
 
-			body = &bytes.Buffer{}
-			writer := multipart.NewWriter(body)
-			part, err := writer.CreateFormFile("source", filepath.Base("tempfile"))
-			ErrorHandling(err, "Error while creating part file", 1)
+		file, err := os.Open("tempfile")
+		ErrorHandling(err, "Problem while readind temp file", 0)
 
-			_, err = io.Copy(part, file)
-			ErrorHandling(err, "Error while copying file in to the part", 1)
+		defer file.Close();
 
-			_ = writer.WriteField("access_token", os.Getenv(FB_ACCESS_TOKEN))
-			_ = writer.WriteField("caption", category[element.Category]+" - "+element.Text+" - "+element.Address)
+		// **************** Photo Upload begin ******************************
+		body = &bytes.Buffer{}
+		writer := multipart.NewWriter(body)
+		part, err := writer.CreateFormFile("source", filepath.Base("tempfile"))
+		ErrorHandling(err, "Error while creating part file", 1)
 
-			err = writer.Close()
-			ErrorHandling(err, "Error while closing writer", 1)
+		_, err = io.Copy(part, file)
+		ErrorHandling(err, "Error while copying file in to the part", 0)
 
-			reqFB, errFB := http.NewRequest("POST", (fbUrl+fbResource), body)
-			reqFB.Header.Set("Content-Type", writer.FormDataContentType())
+		_ = writer.WriteField("access_token", os.Getenv(FB_ACCESS_TOKEN))
+		_ = writer.WriteField("no_story", "true")
 
-			clientFB := &http.Client{}
-			respFB, errFB := clientFB.Do(reqFB)
+		err = writer.Close()
+		ErrorHandling(err, "Error while closing writer", 0)
 
-			ErrorHandling(errFB, "Problem while posting fine on facebook", 1)
+		reqFB, errFB := http.NewRequest("POST", (fbUrl+fbResourceUpload), body)
+		reqFB.Header.Set("Content-Type", writer.FormDataContentType())
 
-			rFB, err3 := ioutil.ReadAll(respFB.Body)
-			ErrorHandling(err3, "Problem while reading response: ", 1)
+		clientFB := &http.Client{}
+		respFB, errFB := clientFB.Do(reqFB)
+		ErrorHandling(errFB, "Problem while posting fine on facebook", 0)
 
-			respCode := respFB.StatusCode
-			fmt.Printf("Resp Code: %v\n", respCode)
-			if respCode != 200 {
-				fmt.Println("Error: " + fmt.Sprintf("%s", rFB))
-				//ErrorHandling(errors.New("Error while posting fine on facebook"), "Error: ", 1)
+		jsonDataFromHttp, errFB := ioutil.ReadAll(respFB.Body)
+		ErrorHandling(errFB, "Error while parsing body: ", 0)
+
+		errFB = json.Unmarshal(jsonDataFromHttp, &photo)
+		ErrorHandling(errFB, "Error while converting to json: ", 0)
+
+		respCode := respFB.StatusCode
+		fmt.Printf("Resp Code: %v\n", respCode)
+		if respCode != 200 {
+			fmt.Println("Error: " + fmt.Sprintf("%s", r))
+			ErrorHandling(errors.New("[Facebook] Error while trying to retrieve photoId"), "Error: ", 0)
+		}
+
+		photoId = photo.Id
+		fmt.Printf("[Facebook] Uploaded photo id: %v\n", photoId)
+		// *************** Photo Upload End *************************************
+
+		// *************** Photo Details Begin *************************************
+		fbResourcePhotoDetails := fbUrl + "/" + photoId
+		reqFB, _ = http.NewRequest("GET", fbResourcePhotoDetails, nil)
+		client := &http.Client{}
+		respFB, errFB = client.Do(reqFB)
+		ErrorHandling(errFB, "Error while requesting data for photo details: ", 1)
+
+		jsonDataFromHttp, errFB = ioutil.ReadAll(respFB.Body)
+		fmt.Println("JSON PHOTO Details: " + fmt.Sprintf("%s", jsonDataFromHttp))
+		ErrorHandling(err, "Error while parsing body: ", 0)
+		errFB = json.Unmarshal(jsonDataFromHttp, &photoDetails)
+
+		photoLink = photoDetails.link
+		fmt.Printf("[Facebook] Uploaded photo link: %v\n", photoLink)
+		// *************** Photo Details End *************************************
+
+		// *************** Feed Post Begin ****************************************
+		fbMessage := category[element.Category]
+		if element.Text != "" {
+			fbMessage = fbMessage+" - "+element.Text
+		}
+		if element.Address != "" {
+			fbMessage = fbMessage+" In "+element.Address
+		}
+
+		parameters := url.Values{}
+		parameters.Add("access_token", FB_ACCESS_TOKEN)
+		parameters.Add("message", fbMessage)
+		parameters.Add("link", photoLink)
+
+		req, _ = http.NewRequest("POST", fbUrl+"/"+os.Getenv(FB_PAGE_ID)+"/feed", bytes.NewBufferString(parameters.Encode()))
+
+		client = &http.Client{}
+		respFB, errFB = client.Do(req)
+		if !ErrorHandling(errFB, "Problem while posting feed", 0) {
+
+			jsonDataFromHttp, errFB = ioutil.ReadAll(respFB.Body)
+			if !ErrorHandling(errFB, "Problem while reading response: ", 0) {
+
+				respCode := respFB.StatusCode
+				fmt.Printf("Resp Code: %v\n", respCode)
+				if respCode != 200 {
+					fmt.Println("Error: " + fmt.Sprintf("%s", r))
+					ErrorHandling(errors.New("Error while trying to post feed with photo link"), "Error: ", 0)
+				}
+				errFB = json.Unmarshal(jsonDataFromHttp, &feed)
+				fmt.Println("Feed " + feed.Id + " published on facebook")
 			}
 		}
+		// *************** Feed Post End ****************************************
+		//		}
 		// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 		fmt.Println("------------------------------------------------------------------------------------")
@@ -422,18 +488,29 @@ func publish(w http.ResponseWriter, r *http.Request) {
 
 		if w != nil && r != nil {
 			io.WriteString(w, "------------------------------------------------------------------------------------\n")
-			io.WriteString(w, "Endpoint ..........." + endpoint + "\n")
-			io.WriteString(w, "Place ID............" + placeId + "\n")
-			io.WriteString(w, "ID ................." + fmt.Sprintf("%v", tweet.Id()) + "\n")
-			io.WriteString(w, "Tweet .............." + tweet.Text() + "\n")
-			io.WriteString(w, "User ..............." + tweet.User().Name() + "\n")
-			io.WriteString(w, "latitude ..........." + latitude + "\n")
-			io.WriteString(w, "longitude .........." + longitude + "\n")
+			io.WriteString(w, "Endpoint ..........."+endpoint+"\n")
+			io.WriteString(w, "Place ID............"+placeId+"\n")
+			io.WriteString(w, "ID ................."+fmt.Sprintf("%v", tweet.Id())+"\n")
+			io.WriteString(w, "Tweet .............."+tweet.Text()+"\n")
+			io.WriteString(w, "User ..............."+tweet.User().Name()+"\n")
+			io.WriteString(w, "latitude ..........."+latitude+"\n")
+			io.WriteString(w, "longitude .........."+longitude+"\n")
 			io.WriteString(w, "------------------------------------------------------------------------------------\n\n")
 		}
-    }
+	}
 }
 
+type Photo struct {
+	Id string `json:"id"`
+}
+
+type Feed struct {
+	Id string `json:"id"`
+}
+
+type PhotoDetails struct {
+	link string `json:"link"`
+}
 
 //func getIpAddress () string {
 //
