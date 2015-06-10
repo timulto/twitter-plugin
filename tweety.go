@@ -372,6 +372,7 @@ func publish(w http.ResponseWriter, r *http.Request) {
 		var photo Photo
 		var photoDetails PhotoDetails
 		var feed Feed
+		var me Me
 		var photoId string
 		var photoLink string
 
@@ -384,6 +385,23 @@ func publish(w http.ResponseWriter, r *http.Request) {
 
 		defer file.Close();
 
+		// **************** Get Page token ******************************
+
+		fbResourceMe := fbUrl + "/me/accounts?access_token=" + os.Getenv(FB_ACCESS_TOKEN)
+		reqFB, _ := http.NewRequest("GET", fbResourceMe, nil)
+		client := &http.Client{}
+		respFB, errFB := client.Do(reqFB)
+		ErrorHandling(errFB, "Error while requesting page access token: ", 0)
+
+		jsonDataFromHttp, errFB := ioutil.ReadAll(respFB.Body)
+		fmt.Println("JSON ME Details: " + fmt.Sprintf("%s", jsonDataFromHttp))
+		ErrorHandling(err, "Error while parsing body: ", 0)
+		errFB = json.Unmarshal(jsonDataFromHttp, &me)
+
+		pageAccessToken := me.Access_token
+		fmt.Println("[Facebook] got access token")
+		// ******************************************************************
+
 		// **************** Photo Upload begin ******************************
 		body = &bytes.Buffer{}
 		writer := multipart.NewWriter(body)
@@ -393,20 +411,21 @@ func publish(w http.ResponseWriter, r *http.Request) {
 		_, err = io.Copy(part, file)
 		ErrorHandling(err, "Error while copying file in to the part", 0)
 
-		_ = writer.WriteField("access_token", os.Getenv(FB_ACCESS_TOKEN))
+		_ = writer.WriteField("access_token", pageAccessToken)
 		_ = writer.WriteField("no_story", "true")
 
 		err = writer.Close()
 		ErrorHandling(err, "Error while closing writer", 0)
 
-		reqFB, errFB := http.NewRequest("POST", (fbUrl+fbResourceUpload), body)
+		reqFB, errFB = http.NewRequest("POST", (fbUrl+fbResourceUpload), body)
 		reqFB.Header.Set("Content-Type", writer.FormDataContentType())
 
 		clientFB := &http.Client{}
-		respFB, errFB := clientFB.Do(reqFB)
+		respFB, errFB = clientFB.Do(reqFB)
 		ErrorHandling(errFB, "Problem while posting fine on facebook", 0)
 
-		jsonDataFromHttp, errFB := ioutil.ReadAll(respFB.Body)
+		jsonDataFromHttp, errFB = ioutil.ReadAll(respFB.Body)
+		fmt.Println("JSON PHOTO Upload Details: " + fmt.Sprintf("%s", jsonDataFromHttp))
 		ErrorHandling(errFB, "Error while parsing body: ", 0)
 
 		errFB = json.Unmarshal(jsonDataFromHttp, &photo)
@@ -510,6 +529,12 @@ type Feed struct {
 
 type PhotoDetails struct {
 	link string `json:"link"`
+}
+
+type Me struct {
+	Id string `json:"id"`
+	Name string `json:"name"`
+	Access_token string `json:"access_token"`
 }
 
 //func getIpAddress () string {
