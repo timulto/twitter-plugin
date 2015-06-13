@@ -1,8 +1,6 @@
 package main
 
 import (
-
-	"net/http"
 	"fmt"
 	"time"
 	"io/ioutil"
@@ -12,9 +10,21 @@ import (
 	"strconv"
 	"bytes"
 	"errors"
+	"os"
+	"mime/multipart"
+	"io"
+	"net/http"
+	"path/filepath"
 )
 
+const(
+	FB_ACCESS_TOKEN = "FB_ACCESS_TOKEN"
+	FB_PAGE_ID = "FB_PAGE_ID"
 
+)
+var (
+	body io.ReadWriter
+)
 
 func GetFines() (data []Fine) {
 
@@ -89,5 +99,172 @@ func MarkAsTwitted(tweet *twittergo.Tweet, element Fine) {
 			fmt.Println("Tweet " + tId + " marked as published.")
 		}
 	}
+
+
 }
 
+// Facebook routines
+func GetFBPageToken() (string, error) {
+
+	fbUrl := "https://graph.facebook.com"
+	fbResourceMe := fbUrl + "/" + os.Getenv(FB_PAGE_ID) + "?access_token=" + os.Getenv(FB_ACCESS_TOKEN) + "&fields=id,name,access_token"
+	var me Me
+
+	reqFB, _ := http.NewRequest("GET", fbResourceMe, nil)
+	client := &http.Client{}
+	respFB, errFB := client.Do(reqFB)
+	ErrorHandling(errFB, "Error while requesting page access token: ", 0)
+
+	jsonDataFromHttp, errFB := ioutil.ReadAll(respFB.Body)
+	fmt.Println("[controller.GetFBPageToken] JSON /accounts details: " + fmt.Sprintf("%s", jsonDataFromHttp))
+	ErrorHandling(errFB, "Error while parsing body: ", 0)
+	errFB = json.Unmarshal(jsonDataFromHttp, &me)
+
+	respCode := respFB.StatusCode
+	fmt.Printf("[controller.GetFBPageToken] Resp Code: %v\n", respCode)
+	if respCode != 200 {
+		e := errors.New("[controller.GetFBPageToken] Error while retreiving facebook access token")
+		ErrorHandling(e, "Error: ", 0)
+		return "", e
+	}
+	pageAccessToken := me.Access_token
+	fmt.Println("[controller.GetFBPageToken] got access token")
+
+	return pageAccessToken, nil
+
+}
+
+func FBUploadPhoto(pageAccessToken string, image []byte) (string, error) {
+
+	// creating temp file
+	fileErr := ioutil.WriteFile("tempfile", image, 0777)
+	ErrorHandling(fileErr, "[controller.FBUploadPhoto] Problem while writing temp file", 0)
+
+	file, fileTempErr := os.Open("tempfile")
+	ErrorHandling(fileTempErr, "[controller.FBUploadPhoto] Problem while readind temp file", 0)
+
+	defer file.Close();
+
+	fbUrl := "https://graph.facebook.com"
+	fbResourceUpload := "/" + os.Getenv(FB_PAGE_ID) + "/photos"
+	var photo Photo
+
+	body = &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	part, err := writer.CreateFormFile("source", filepath.Base("tempfile"))
+	ErrorHandling(err, "[controller.FBUploadPhoto] Error while creating part file", 0)
+
+	_, err = io.Copy(part, file)
+	if ErrorHandling(err, "[controller.FBUploadPhoto] Error while copying file in to the part", 0) {
+		return "", err
+	}
+
+	_ = writer.WriteField("access_token", pageAccessToken)
+	_ = writer.WriteField("no_story", "true")
+
+	err = writer.Close()
+	if ErrorHandling(err, "[controller.FBUploadPhoto] Error while closing writer", 0) {
+		return "", err
+	}
+
+	reqFB, errFB := http.NewRequest("POST", (fbUrl + fbResourceUpload), body)
+	reqFB.Header.Set("Content-Type", writer.FormDataContentType())
+
+	clientFB := &http.Client{}
+	respFB, errFB1 := clientFB.Do(reqFB)
+	if ErrorHandling(errFB1, "[controller.FBUploadPhoto] Problem while posting feed on Facebook", 0) {
+		return "", errFB1
+	}
+
+	jsonDataFromHttp, errParse := ioutil.ReadAll(respFB.Body)
+	fmt.Println("[controller.FBUploadPhoto] JSON Photo Upload Details: " + fmt.Sprintf("%s", jsonDataFromHttp))
+	if ErrorHandling(errParse, "[controller.FBUploadPhoto] Error while parsing Facebook upload body: ", 0) {
+		return "", errParse
+	}
+
+	errFB = json.Unmarshal(jsonDataFromHttp, &photo)
+	if ErrorHandling(errFB, "[controller.FBUploadPhoto] Error while converting Facebook upload body to json: ", 0) {
+		return "", errFB
+	}
+
+	respCode := respFB.StatusCode
+	fmt.Printf("[controller.FBUploadPhoto] Resp Code: %v\n", respCode)
+	if respCode != 200 {
+		errFB = errors.New("[controller.FBUploadPhoto]  Error while trying to retrieve photoId")
+		ErrorHandling(errFB, "", 0)
+		return "", errFB
+	}
+
+	photoId := photo.Id
+	fmt.Printf("[controller.FBUploadPhoto] Uploaded photo on Facebook id: %v\n", photoId)
+
+	return photoId, nil
+}
+
+func GetFBPhotoDetails(photoId string, pageAccessToken string) (string, error) {
+
+	var photoDetails PhotoDetails
+	fbUrl := "https://graph.facebook.com"
+	fbResourcePhotoDetails := fbUrl + "/" + photoId + "?access_token=" + pageAccessToken + "&fields=link"
+	reqFB, errFB := http.NewRequest("GET", fbResourcePhotoDetails, nil)
+	client := &http.Client{}
+	respFB, errFB := client.Do(reqFB)
+	if ErrorHandling(errFB, "[controller.GetFBPhotoDetails] Error while requesting Facebook photo details: ", 0) {
+		return "", errFB
+	}
+
+	jsonDataFromHttp, errRead := ioutil.ReadAll(respFB.Body)
+	if ErrorHandling(errRead, "[controller.GetFBPhotoDetails] Error while parsing Facebook photo details body: ", 0) {
+		return "", errRead
+	}
+
+	fmt.Println("[controller.GetFBPhotoDetails] JSON Photo Details: " + fmt.Sprintf("%s", jsonDataFromHttp))
+
+	errFB = json.Unmarshal(jsonDataFromHttp, &photoDetails)
+	if ErrorHandling(errFB, "[controller.GetFBPhotoDetails] Error while unmarshaling Facebook photo details: ", 0) {
+		return "", errFB
+	}
+
+	photoLink := photoDetails.Link
+	fmt.Printf("[controller.GetFBPhotoDetails] Facebook photo link: %v\n", photoLink)
+
+	return photoLink, nil
+}
+
+func FBPostFeed (msgCategory string, msgText string, msgAddress string, pageAccessToken string, photoLink string) {
+
+	fbUrl := "https://graph.facebook.com"
+	var feed Feed
+	fbMessage := msgCategory
+	if msgText != "" {
+		fbMessage = fbMessage+" - " + msgText
+	}
+	if msgAddress != "" {
+		fbMessage = fbMessage+" In " + msgAddress
+	}
+
+	parameters := url.Values{}
+	parameters.Add("access_token", pageAccessToken)
+	parameters.Add("message", fbMessage)
+	parameters.Add("link", photoLink)
+
+	reqFB, _ := http.NewRequest("POST", fbUrl+"/"+os.Getenv(FB_PAGE_ID)+"/feed", bytes.NewBufferString(parameters.Encode()))
+
+	client := &http.Client{}
+	respFB, errFB := client.Do(reqFB)
+	if !ErrorHandling(errFB, "Problem while posting feed", 0) {
+
+		jsonDataFromHttp, errFB1 := ioutil.ReadAll(respFB.Body)
+		if !ErrorHandling(errFB1, "Problem while reading response: ", 0) {
+
+			respCode := respFB.StatusCode
+			fmt.Printf("Resp Code: %v\n", respCode)
+			if respCode != 200 {
+				ErrorHandling(errors.New("Error while trying to post feed with photo link"), "Error: ", 0)
+			}
+			errFB = json.Unmarshal(jsonDataFromHttp, &feed)
+			fmt.Println("Feed " + feed.Id + " published on facebook")
+		}
+	}
+
+}
