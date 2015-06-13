@@ -41,19 +41,17 @@ func GetFines() (data []Fine) {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 
-	fmt.Printf("Resp Code: %v\n", resp.StatusCode)
-	ErrorHandling(err, "Error while requesting data: ", 1)
+	fmt.Printf("[Controller.GetFines] Resp Code: %v\n", resp.StatusCode)
+	ErrorHandling(err, "Controller.GetFines] Error while requesting data: ", 1)
 
 	jsonDataFromHttp, err := ioutil.ReadAll(resp.Body)
-	ErrorHandling(err, "Error while parsing body: ", 1)
-
-//	fmt.Println("JSON FINES: " + fmt.Sprintf("%s", jsonDataFromHttp))
+	ErrorHandling(err, "[Controller.GetFines] Error while parsing body: ", 1)
 
 	//data []Fine
 	err = json.Unmarshal(jsonDataFromHttp, &data)
-	ErrorHandling(err, "Error while unmarshalling fines: ", 0)
+	ErrorHandling(err, "[Controller.GetFines] Error while unmarshalling fines: ", 0)
 
-	fmt.Printf("Found %v Fines....\n", len(data))
+	fmt.Printf("[Controller.GetFines] Found %v Fines....\n", len(data))
 	return
 }
 
@@ -85,18 +83,18 @@ func MarkAsTwitted(tweet *twittergo.Tweet, element Fine) {
 
 	client := &http.Client{}
 	resp1, err1 := client.Do(req)
-	if !ErrorHandling(err1, "Problem while marking tweet "+tId+" published", 0) {
+	if !ErrorHandling(err1, "[Controller.MarkAsTwitted] Problem while marking tweet "+tId+" published", 0) {
 
 		r, err2 := ioutil.ReadAll(resp1.Body)
-		if !ErrorHandling(err2, "Problem while reading response: ", 0) {
+		if !ErrorHandling(err2, "[Controller.MarkAsTwitted] Problem while reading response: ", 0) {
 
 			respCode := resp1.StatusCode
-			fmt.Printf("Resp Code: %v\n", respCode)
+			fmt.Printf("[Controller.MarkAsTwitted] Resp Code: %v\n", respCode)
 			if respCode != 200 {
 				fmt.Println("Error: " + fmt.Sprintf("%s", r))
-				ErrorHandling(errors.New("Error while trying to mark tweet as red"), "Error: ", 10)
+				ErrorHandling(errors.New("[Controller.MarkAsTwitted] Error while trying to mark tweet as red"), "Error: ", 10)
 			}
-			fmt.Println("Tweet " + tId + " marked as published.")
+			fmt.Println("[Controller.MarkAsTwitted] Tweet " + tId + " marked as published.")
 		}
 	}
 
@@ -116,7 +114,7 @@ func GetFBPageToken() (string, error) {
 	ErrorHandling(errFB, "Error while requesting page access token: ", 0)
 
 	jsonDataFromHttp, errFB := ioutil.ReadAll(respFB.Body)
-	fmt.Println("[controller.GetFBPageToken] JSON /accounts details: " + fmt.Sprintf("%s", jsonDataFromHttp))
+	//fmt.Println("[controller.GetFBPageToken] JSON accounts details: " + fmt.Sprintf("%s", jsonDataFromHttp))
 	ErrorHandling(errFB, "Error while parsing body: ", 0)
 	errFB = json.Unmarshal(jsonDataFromHttp, &me)
 
@@ -136,6 +134,7 @@ func GetFBPageToken() (string, error) {
 
 func FBUploadPhoto(pageAccessToken string, image []byte) (string, error) {
 
+	fmt.Println("[controller.FBUploadPhoto] Called")
 	// creating temp file
 	fileErr := ioutil.WriteFile("tempfile", image, 0777)
 	ErrorHandling(fileErr, "[controller.FBUploadPhoto] Problem while writing temp file", 0)
@@ -177,7 +176,7 @@ func FBUploadPhoto(pageAccessToken string, image []byte) (string, error) {
 	}
 
 	jsonDataFromHttp, errParse := ioutil.ReadAll(respFB.Body)
-	fmt.Println("[controller.FBUploadPhoto] JSON Photo Upload Details: " + fmt.Sprintf("%s", jsonDataFromHttp))
+	//fmt.Println("[controller.FBUploadPhoto] JSON Photo Upload Details: " + fmt.Sprintf("%s", jsonDataFromHttp))
 	if ErrorHandling(errParse, "[controller.FBUploadPhoto] Error while parsing Facebook upload body: ", 0) {
 		return "", errParse
 	}
@@ -218,7 +217,7 @@ func GetFBPhotoDetails(photoId string, pageAccessToken string) (string, error) {
 		return "", errRead
 	}
 
-	fmt.Println("[controller.GetFBPhotoDetails] JSON Photo Details: " + fmt.Sprintf("%s", jsonDataFromHttp))
+	//fmt.Println("[controller.GetFBPhotoDetails] JSON Photo Details: " + fmt.Sprintf("%s", jsonDataFromHttp))
 
 	errFB = json.Unmarshal(jsonDataFromHttp, &photoDetails)
 	if ErrorHandling(errFB, "[controller.GetFBPhotoDetails] Error while unmarshaling Facebook photo details: ", 0) {
@@ -235,7 +234,7 @@ func FBPostFeed (msgCategory string, msgText string, msgAddress string, pageAcce
 
 	fbUrl := "https://graph.facebook.com"
 	var feed Feed
-	fbMessage := msgCategory
+	fbMessage := Category[msgCategory]
 	if msgText != "" {
 		fbMessage = fbMessage+" - " + msgText
 	}

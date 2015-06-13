@@ -309,6 +309,10 @@ func publish(w http.ResponseWriter, r *http.Request) {
 		resp   *twittergo.APIResponse
 		tweet  *twittergo.Tweet
 		//mp *multipart.Writer
+		photoId string
+		photoLink string
+		errPhoto error
+		errLink error
 	);
 
 
@@ -326,6 +330,9 @@ func publish(w http.ResponseWriter, r *http.Request) {
 			io.WriteString(w, "No mew tweet to post\n")
 		}
 	}
+
+	// ***** Get Page token ***************************
+	pageAccessToken, _ := GetFBPageToken()
 
 	for _, element := range toTwet {
 
@@ -357,25 +364,12 @@ func publish(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-
-
-		// >>>>>>To Refactor >>>>>>>>>>>>>>>>>>>>>>>>>>
-		//Post fine on facebook
-		//		if err == nil {
-
-
-
-		var photoId string
-		var photoLink string
-		var errPhoto error
-		var errLink error
-
-		pageAccessToken, errFB := GetFBPageToken() // ***** Get Page token
-		if errFB != nil {
+		// Post fine on Facebook
+		if pageAccessToken != "" {
 			photoId, errPhoto = FBUploadPhoto(pageAccessToken, image) // **** Photo Upload
-			if errPhoto != nil {
+			if errPhoto == nil {
 				photoLink, errLink = GetFBPhotoDetails(photoId, pageAccessToken) // **** Photo Details
-				if errLink != nil {
+				if errLink == nil {
 					FBPostFeed(element.Category, element.Text, element.Address, pageAccessToken, photoLink) // **** Feed Post Begin
 				}
 			}
