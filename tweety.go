@@ -323,16 +323,17 @@ func publish(w http.ResponseWriter, r *http.Request) {
 	var toTwet = GetFines()
 	var image []byte
 	baseendpoint := "/1.1/statuses/update_with_media.json"
+	pageAccessToken := ""
 
 	if len(toTwet) == 0 {
 		fmt.Println("No mew tweet to post")
 		if w != nil {
 			io.WriteString(w, "No mew tweet to post\n")
 		}
+	} else {
+		// ***** Get Page token ***************************
+		pageAccessToken, _ = GetFBPageToken()
 	}
-
-	// ***** Get Page token ***************************
-	pageAccessToken, _ := GetFBPageToken()
 
 	for _, element := range toTwet {
 
@@ -348,6 +349,7 @@ func publish(w http.ResponseWriter, r *http.Request) {
 
 		ErrorHandling(err, "Problem loading body: ", 1)
 
+		tId := ""
 		req, err = http.NewRequest("POST", endpoint, body)
 		if !ErrorHandling(err, "[Tweet Post] Could not parse request: ", 0) {
 
@@ -360,17 +362,20 @@ func publish(w http.ResponseWriter, r *http.Request) {
 			err = resp.Parse(tweet)
 			if !ErrorHandling(err, "[Tweet Post] Problem parsing response: ", 0) {
 				// Mark fine posted on twitter
-				MarkAsTwitted(tweet, element)
+				tId = strconv.FormatUint(tweet.Id(), 10)
+				MarkAsPosted(tId, element, "twitter")
 			}
 		}
 
 		// Post fine on Facebook
+		fId := ""
 		if pageAccessToken != "" {
 			photoId, errPhoto = FBUploadPhoto(pageAccessToken, image) // **** Photo Upload
 			if errPhoto == nil {
 				photoLink, errLink = GetFBPhotoDetails(photoId, pageAccessToken) // **** Photo Details
 				if errLink == nil {
-					FBPostFeed(element.Category, element.Text, element.Address, pageAccessToken, photoLink) // **** Feed Post Begin
+					fId = FBPostFeed(element.Category, element.Text, element.Address, pageAccessToken, photoLink) // **** Feed Post Begin
+					MarkAsPosted(fId, element, "facebook")
 				}
 			}
 		}
@@ -378,7 +383,8 @@ func publish(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("------------------------------------------------------------------------------------")
 		fmt.Printf("Endpoint ...........%v\n", endpoint)
 		fmt.Printf("Place ID ...........%v\n", placeId)
-		fmt.Printf("ID .................%v\n", tweet.Id())
+		fmt.Printf("Twitter ID .........%v\n", tweet.Id())
+		fmt.Printf("Facebook ID ........%v\n", tweet.Id())
 		fmt.Printf("Tweet ..............%v\n", tweet.Text())
 		fmt.Printf("User ...............%v\n", tweet.User().Name())
 		fmt.Printf("latitude ...........%v\n", latitude)
@@ -387,51 +393,15 @@ func publish(w http.ResponseWriter, r *http.Request) {
 
 		if w != nil && r != nil {
 			io.WriteString(w, "------------------------------------------------------------------------------------\n")
-			io.WriteString(w, "Endpoint ..........."+endpoint+"\n")
-			io.WriteString(w, "Place ID............"+placeId+"\n")
-			io.WriteString(w, "ID ................."+fmt.Sprintf("%v", tweet.Id())+"\n")
-			io.WriteString(w, "Tweet .............."+tweet.Text()+"\n")
-			io.WriteString(w, "User ..............."+tweet.User().Name()+"\n")
-			io.WriteString(w, "latitude ..........."+latitude+"\n")
-			io.WriteString(w, "longitude .........."+longitude+"\n")
+			io.WriteString(w, "Endpoint ..........." + endpoint + "\n")
+			io.WriteString(w, "Place ID............" + placeId + "\n")
+			io.WriteString(w, "Twitter ID ........." + tId + "\n")
+			io.WriteString(w, "Facebook ID ........" + fId + "\n")
+			io.WriteString(w, "Tweet .............." + tweet.Text() + "\n")
+			io.WriteString(w, "User ..............." + tweet.User().Name() + "\n")
+			io.WriteString(w, "latitude ..........." + latitude + "\n")
+			io.WriteString(w, "longitude .........." + longitude + "\n")
 			io.WriteString(w, "------------------------------------------------------------------------------------\n\n")
 		}
 	}
 }
-
-type Photo struct {
-	Id string `json:"id"`
-}
-
-type Feed struct {
-	Id string `json:"id"`
-}
-
-type PhotoDetails struct {
-	Link string `json:"link"`
-}
-
-type Me struct {
-	Id string `json:"id"`
-	Name string `json:"name"`
-	Access_token string `json:"access_token"`
-}
-
-//func getIpAddress () string {
-//
-//	var toRet string
-//
-//	host, _ := os.Hostname()
-//	addrs, _ := net.LookupIP(host)
-//
-//	for _, addr := range addrs {
-//		if ipv4 := addr.To4(); ipv4 != nil {
-//			if toRet == "" {
-//				toRet = string(ipv4[:])
-//			}
-//			//fmt.Println("IPv4: ", ipv4)
-//		}
-//	}
-//	fmt.Println("IPv4: " + toRet)
-//	return toRet
-//}

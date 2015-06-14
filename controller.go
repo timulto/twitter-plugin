@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"encoding/json"
 	"net/url"
-	"github.com/kurrik/twittergo"
 	"strconv"
 	"bytes"
 	"errors"
@@ -55,15 +54,13 @@ func GetFines() (data []Fine) {
 	return
 }
 
-func MarkAsTwitted(tweet *twittergo.Tweet, element Fine) {
+func MarkAsPosted(id string, element Fine, service string) {
 
 	url1 := "http://beta.timulto.org"
-	resource := "/api/fine/" + element.Id + "/twitter"
-
-	tId := strconv.FormatUint(tweet.Id(), 10)
+	resource := "/api/fine/" + element.Id + "/" + service
 
 	parameters := url.Values{}
-	parameters.Add("postId", tId)
+	parameters.Add("postId", id)
 
 	u, _ := url.ParseRequestURI(url1)
 	u.Path = resource
@@ -71,7 +68,7 @@ func MarkAsTwitted(tweet *twittergo.Tweet, element Fine) {
 
 	t := time.Now().Local()
 	tstamp := t.Format("20060102150405")
-	toEncode := tstamp + "#" + APP_NAME + "#" + "twitter" + "#" + element.Id
+	toEncode := tstamp + "#" + APP_NAME + "#" + service + "#" + element.Id
 	token := EncHmacMD5(toEncode, hmacKey)
 
 	req, _ := http.NewRequest("POST", urlStr, bytes.NewBufferString(parameters.Encode()))
@@ -83,22 +80,20 @@ func MarkAsTwitted(tweet *twittergo.Tweet, element Fine) {
 
 	client := &http.Client{}
 	resp1, err1 := client.Do(req)
-	if !ErrorHandling(err1, "[Controller.MarkAsTwitted] Problem while marking tweet "+tId+" published", 0) {
+	if !ErrorHandling(err1, "[Controller.MarkAsPosted] Problem while marking fine " + id +" published on " + service, 0) {
 
 		r, err2 := ioutil.ReadAll(resp1.Body)
-		if !ErrorHandling(err2, "[Controller.MarkAsTwitted] Problem while reading response: ", 0) {
+		if !ErrorHandling(err2, "[Controller.MarkAsPosted] Problem while reading response: ", 0) {
 
 			respCode := resp1.StatusCode
-			fmt.Printf("[Controller.MarkAsTwitted] Resp Code: %v\n", respCode)
+			fmt.Printf("[Controller.MarkAsPosted] Resp Code: %v\n", respCode)
 			if respCode != 200 {
 				fmt.Println("Error: " + fmt.Sprintf("%s", r))
-				ErrorHandling(errors.New("[Controller.MarkAsTwitted] Error while trying to mark tweet as red"), "Error: ", 10)
+				ErrorHandling(errors.New("[Controller.MarkAsPosted] Error while trying to marking fine posted on " + service), "Error: ", 10)
 			}
-			fmt.Println("[Controller.MarkAsTwitted] Tweet " + tId + " marked as published.")
+			fmt.Println("[Controller.MarkAsPosted] Fine " + id + " marked as published on " + service)
 		}
 	}
-
-
 }
 
 // Facebook routines
@@ -230,7 +225,7 @@ func GetFBPhotoDetails(photoId string, pageAccessToken string) (string, error) {
 	return photoLink, nil
 }
 
-func FBPostFeed (msgCategory string, msgText string, msgAddress string, pageAccessToken string, photoLink string) {
+func FBPostFeed (msgCategory string, msgText string, msgAddress string, pageAccessToken string, photoLink string) (id string) {
 
 	fbUrl := "https://graph.facebook.com"
 	var feed Feed
@@ -263,7 +258,26 @@ func FBPostFeed (msgCategory string, msgText string, msgAddress string, pageAcce
 			}
 			errFB = json.Unmarshal(jsonDataFromHttp, &feed)
 			fmt.Println("Feed " + feed.Id + " published on facebook")
+			return feed.id
 		}
 	}
+	return ""
+}
 
+type Photo struct {
+	Id string `json:"id"`
+}
+
+type Feed struct {
+	Id string `json:"id"`
+}
+
+type PhotoDetails struct {
+	Link string `json:"link"`
+}
+
+type Me struct {
+	Id string `json:"id"`
+	Name string `json:"name"`
+	Access_token string `json:"access_token"`
 }
