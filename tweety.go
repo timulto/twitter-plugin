@@ -396,12 +396,9 @@ func publish(w http.ResponseWriter, r *http.Request) {
 			io.WriteString(w, "------------------------------------------------------------------------------------\n")
 			io.WriteString(w, "Endpoint ..........." + endpoint + "\n")
 			io.WriteString(w, "Place ID............" + placeId + "\n")
-			if tId != nil {
-				io.WriteString(w, "Twitter ID ........."+tId+"\n")
-			}
-			if fId != nil {
-				io.WriteString(w, "Facebook ID ........"+fId+"\n")
-			}
+			io.WriteString(w, "Twitter ID ........."+tId+"\n")
+			io.WriteString(w, "Facebook ID ........"+fId+"\n")
+
 			if tweet != nil {
 				io.WriteString(w, "Tweet .............."+tweet.Text()+"\n")
 				io.WriteString(w, "User ..............."+tweet.User().Name()+"\n")
