@@ -19,7 +19,7 @@ import (
 const(
 	FB_ACCESS_TOKEN = "FB_ACCESS_TOKEN"
 	FB_PAGE_ID = "FB_PAGE_ID"
-
+    APP_NAME_TWITTER = "twitter"
 )
 var (
 	body io.ReadWriter
@@ -29,13 +29,13 @@ func GetFines() (data []Fine) {
 
 	t := time.Now().Local()
 	tstamp := t.Format("20060102150405")
-	toEncode := tstamp + "#" + APP_NAME + "#" + "twitter"
+	toEncode := tstamp + "#" + APP_NAME_TWITTER + "#" + "twitter"
 	token := EncHmacMD5(toEncode, hmacKey)
 
 	timultoUrl := "http://beta.timulto.org/api/fines/twitter"
 	req, _ := http.NewRequest("GET", timultoUrl, nil)
 	req.Header.Add("timestamp", tstamp)
-	req.Header.Add("app", APP_NAME)
+	req.Header.Add("app", APP_NAME_TWITTER)
 	req.Header.Add("token", token)
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -68,14 +68,14 @@ func MarkAsPosted(id string, element Fine, service string) {
 
 	t := time.Now().Local()
 	tstamp := t.Format("20060102150405")
-	toEncode := tstamp + "#" + APP_NAME + "#" + service + "#" + element.Id
+	toEncode := tstamp + "#" + APP_NAME_TWITTER + "#" + service + "#" + element.Id
 	token := EncHmacMD5(toEncode, hmacKey)
 
 	req, _ := http.NewRequest("POST", urlStr, bytes.NewBufferString(parameters.Encode()))
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Add("Content-Length", strconv.Itoa(len(parameters.Encode())))
 	req.Header.Add("timestamp", tstamp)
-	req.Header.Add("app", APP_NAME)
+	req.Header.Add("app", APP_NAME_TWITTER)
 	req.Header.Add("token", token)
 
 	client := &http.Client{}
@@ -89,7 +89,7 @@ func MarkAsPosted(id string, element Fine, service string) {
 			fmt.Printf("[Controller.MarkAsPosted] Resp Code: %v\n", respCode)
 			if respCode != 200 {
 				fmt.Println("Error: " + fmt.Sprintf("%s", r))
-				ErrorHandling(errors.New("[Controller.MarkAsPosted] Error while trying to marking fine posted on " + service), "Error: ", 10)
+				ErrorHandling(errors.New("[Controller.MarkAsPosted] Error while trying to marking fine posted on " + service), "Error: ", 0)
 			}
 			fmt.Println("[Controller.MarkAsPosted] Fine " + id + " marked as published on " + service)
 		}
@@ -258,7 +258,7 @@ func FBPostFeed (msgCategory string, msgText string, msgAddress string, pageAcce
 			}
 			errFB = json.Unmarshal(jsonDataFromHttp, &feed)
 			fmt.Println("Feed " + feed.Id + " published on facebook")
-			return feed.id
+			return feed.Id
 		}
 	}
 	return ""
