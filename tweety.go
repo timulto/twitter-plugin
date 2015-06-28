@@ -215,9 +215,9 @@ func GetBody(message string, media []byte, address string, createdAt string, pla
 	}
 
 	tText := fmt.Sprintf("%v%v%v%v", msgStart, message, msgEnd, msgHash)
-	if len(tText) > 120 {
+	if len(tText) > 110 {
 		fmt.Println("[GetBody] still to long message, truncating to 140")
-		tText = tText[0:120]
+		tText = tText[0:110]
 	}
 
 	fmt.Println("Text: " + tText)
@@ -227,7 +227,7 @@ func GetBody(message string, media []byte, address string, createdAt string, pla
 	//	mp.WriteField("place_id", placeId)
 
 	writer, err = mp.CreateFormField("media[]")
-	ErrorHandling(err, "Error while creating writer: ", 1)
+	ErrorHandling(err, "Error while creating writer: ", 0)
 
 	writer.Write(media)
 	header = fmt.Sprintf("multipart/form-data;boundary=%v", mp.Boundary())
@@ -277,21 +277,21 @@ func getPlaceId(latitude float64, longitude float64) (p string) {
 		client, err = LoadCredentials();
 	}
 
-	ErrorHandling(err, "Error while loading credential: ", 1)
+	ErrorHandling(err, "Error while loading credential: ", 0)
 
 	twitterUrl := "https://api.twitter.com/1.1/geo/reverse_geocode.json?lat=" + strconv.FormatFloat(latitude, 'f', 7, 32) + "&long=" + strconv.FormatFloat(longitude, 'f', 7, 32)
 
 	req, err1 := http.NewRequest("GET", twitterUrl, nil)
-	ErrorHandling(err1, "Error while creating the request object: ", 1)
+	ErrorHandling(err1, "Error while creating the request object: ", 0)
 
 	resp, err2 := client.SendRequest(req)
-	ErrorHandling(err2, "Error while sending the request: ", 1)
+	ErrorHandling(err2, "Error while sending the request: ", 0)
 
 	jsonDataFromHttp, err3 := ioutil.ReadAll(resp.Body)
-	ErrorHandling(err3, "Error while reading response body: ", 1)
+	ErrorHandling(err3, "Error while reading response body: ", 0)
 
 	err4 := json.Unmarshal(jsonDataFromHttp, &data)
-	ErrorHandling(err4, "Error while parsing json response: ", 1)
+	ErrorHandling(err4, "Error while parsing json response: ", 0)
 
 	if len(data.Result.Places) > 0 {
 		return data.Result.Places[0].Id
@@ -374,38 +374,39 @@ func publish(w http.ResponseWriter, r *http.Request) {
 				photoLink, errLink = GetFBPhotoDetails(photoId, pageAccessToken) // **** Photo Details
 				if errLink == nil {
 					fId = FBPostFeed(element.Category, element.Text, element.Address, pageAccessToken, photoLink) // **** Feed Post Begin
-					MarkAsPosted(fId, element, "facebook")
+					fmt.Printf("[tweety.publish] Facebook ID: %v\n", fId)
+					//MarkAsPosted(fId, element, "facebook")
 				}
 			}
 		}
 
-		fmt.Println("------------------------------------------------------------------------------------")
-		fmt.Printf("Endpoint ...........%v\n", endpoint)
-		fmt.Printf("Place ID ...........%v\n", placeId)
-		if tweet != nil {
-			fmt.Printf("Twitter ID .........%v\n", tweet.Id())
-			fmt.Printf("Facebook ID ........%v\n", tweet.Id())
-			fmt.Printf("Tweet ..............%v\n", tweet.Text())
-			fmt.Printf("User ...............%v\n", tweet.User().Name())
-		}
-		fmt.Printf("latitude ...........%v\n", latitude)
-		fmt.Printf("longitude ..........%v\n", longitude)
-		fmt.Println("------------------------------------------------------------------------------------\n\n")
+//		fmt.Println("------------------------------------------------------------------------------------")
+//		fmt.Printf("Endpoint ...........%v\n", endpoint)
+//		fmt.Printf("Place ID ...........%v\n", placeId)
+//		if tweet != nil {
+//			fmt.Printf("Twitter ID .........%v\n", tweet.Id())
+//			fmt.Printf("Facebook ID ........%v\n", tweet.Id())
+//			fmt.Printf("Tweet ..............%v\n", tweet.Text())
+//			fmt.Printf("User ...............%v\n", tweet.User().Name())
+//		}
+//		fmt.Printf("latitude ...........%v\n", latitude)
+//		fmt.Printf("longitude ..........%v\n", longitude)
+//		fmt.Println("------------------------------------------------------------------------------------\n\n")
 
-		if w != nil && r != nil {
-			io.WriteString(w, "------------------------------------------------------------------------------------\n")
-			io.WriteString(w, "Endpoint ..........." + endpoint + "\n")
-			io.WriteString(w, "Place ID............" + placeId + "\n")
-			io.WriteString(w, "Twitter ID ........."+tId+"\n")
-			io.WriteString(w, "Facebook ID ........"+fId+"\n")
-
-			if tweet != nil {
-				io.WriteString(w, "Tweet .............."+tweet.Text()+"\n")
-				io.WriteString(w, "User ..............."+tweet.User().Name()+"\n")
-			}
-			io.WriteString(w, "latitude ..........." + latitude + "\n")
-			io.WriteString(w, "longitude .........." + longitude + "\n")
-			io.WriteString(w, "------------------------------------------------------------------------------------\n\n")
-		}
+//		if w != nil && r != nil {
+//			io.WriteString(w, "------------------------------------------------------------------------------------\n")
+//			io.WriteString(w, "Endpoint ..........." + endpoint + "\n")
+//			io.WriteString(w, "Place ID............" + placeId + "\n")
+//			io.WriteString(w, "Twitter ID ........."+tId+"\n")
+//			io.WriteString(w, "Facebook ID ........"+fId+"\n")
+//
+//			if tweet != nil {
+//				io.WriteString(w, "Tweet .............."+tweet.Text()+"\n")
+//				io.WriteString(w, "User ..............."+tweet.User().Name()+"\n")
+//			}
+//			io.WriteString(w, "latitude ..........." + latitude + "\n")
+//			io.WriteString(w, "longitude .........." + longitude + "\n")
+//			io.WriteString(w, "------------------------------------------------------------------------------------\n\n")
+//		}
 	}
 }

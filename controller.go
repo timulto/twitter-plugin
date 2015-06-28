@@ -246,18 +246,19 @@ func FBPostFeed (msgCategory string, msgText string, msgAddress string, pageAcce
 
 	client := &http.Client{}
 	respFB, errFB := client.Do(reqFB)
-	if !ErrorHandling(errFB, "Problem while posting feed", 0) {
+	if !ErrorHandling(errFB, "[controller.FBPostFeed] Problem while posting feed", 0) {
 
 		jsonDataFromHttp, errFB1 := ioutil.ReadAll(respFB.Body)
-		if !ErrorHandling(errFB1, "Problem while reading response: ", 0) {
+		if !ErrorHandling(errFB1, "[controller.FBPostFeed] Problem while reading response: ", 0) {
 
 			respCode := respFB.StatusCode
-			fmt.Printf("Resp Code: %v\n", respCode)
+			fmt.Printf("[controller.FBPostFeed] Resp Code: %v\n", respCode)
 			if respCode != 200 {
-				ErrorHandling(errors.New("Error while trying to post feed with photo link"), "Error: ", 0)
+				ErrorHandling(errors.New("[controller.FBPostFeed] Error while trying to post feed with photo link"), "Error: ", 0)
+				fmt.Println("[controller.FBPostFeed] Error: " + fmt.Sprintf("%s", jsonDataFromHttp))
 			}
 			errFB = json.Unmarshal(jsonDataFromHttp, &feed)
-			fmt.Println("Feed " + feed.Id + " published on facebook")
+			fmt.Println("[controller.FBPostFeed] Feed " + feed.Id + " published on facebook")
 			return feed.Id
 		}
 	}
