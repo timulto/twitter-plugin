@@ -24,7 +24,6 @@ const CONSUMER_SECRET = "CONSUMER_SECRET"
 const ACCESS_TOKEN = "ACCESS_TOKEN"
 const ACCESS_TOKEN_SECRET = "ACCESS_TOKEN_SECRET"
 const HMAC_KEY = "HMAC_KEY"
-const APP_NAME = "twitter"
 
 var (
 	client *twittergo.Client
@@ -383,10 +382,12 @@ func publish(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("------------------------------------------------------------------------------------")
 		fmt.Printf("Endpoint ...........%v\n", endpoint)
 		fmt.Printf("Place ID ...........%v\n", placeId)
-		fmt.Printf("Twitter ID .........%v\n", tweet.Id())
-		fmt.Printf("Facebook ID ........%v\n", tweet.Id())
-		fmt.Printf("Tweet ..............%v\n", tweet.Text())
-		fmt.Printf("User ...............%v\n", tweet.User().Name())
+		if tweet != nil {
+			fmt.Printf("Twitter ID .........%v\n", tweet.Id())
+			fmt.Printf("Facebook ID ........%v\n", tweet.Id())
+			fmt.Printf("Tweet ..............%v\n", tweet.Text())
+			fmt.Printf("User ...............%v\n", tweet.User().Name())
+		}
 		fmt.Printf("latitude ...........%v\n", latitude)
 		fmt.Printf("longitude ..........%v\n", longitude)
 		fmt.Println("------------------------------------------------------------------------------------\n\n")
@@ -395,10 +396,16 @@ func publish(w http.ResponseWriter, r *http.Request) {
 			io.WriteString(w, "------------------------------------------------------------------------------------\n")
 			io.WriteString(w, "Endpoint ..........." + endpoint + "\n")
 			io.WriteString(w, "Place ID............" + placeId + "\n")
-			io.WriteString(w, "Twitter ID ........." + tId + "\n")
-			io.WriteString(w, "Facebook ID ........" + fId + "\n")
-			io.WriteString(w, "Tweet .............." + tweet.Text() + "\n")
-			io.WriteString(w, "User ..............." + tweet.User().Name() + "\n")
+			if tId != nil {
+				io.WriteString(w, "Twitter ID ........."+tId+"\n")
+			}
+			if fId != nil {
+				io.WriteString(w, "Facebook ID ........"+fId+"\n")
+			}
+			if tweet != nil {
+				io.WriteString(w, "Tweet .............."+tweet.Text()+"\n")
+				io.WriteString(w, "User ..............."+tweet.User().Name()+"\n")
+			}
 			io.WriteString(w, "latitude ..........." + latitude + "\n")
 			io.WriteString(w, "longitude .........." + longitude + "\n")
 			io.WriteString(w, "------------------------------------------------------------------------------------\n\n")
